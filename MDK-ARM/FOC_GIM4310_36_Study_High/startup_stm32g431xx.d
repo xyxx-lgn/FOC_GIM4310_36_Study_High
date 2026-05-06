@@ -1,0 +1,1 @@
+foc_gim4310_36_study_high\startup_stm32g431xx.o: startup_stm32g431xx.s
