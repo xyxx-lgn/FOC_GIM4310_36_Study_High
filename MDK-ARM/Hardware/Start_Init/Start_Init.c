@@ -1,4 +1,4 @@
-﻿#include "Start_Init.h"
+#include "Start_Init.h"
 #include "tim.h"
 #include "adc.h"
 #include "usermain.h"
@@ -19,7 +19,8 @@ void Start_Init(void)
 	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_3);
-	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_4);
+//	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_4);            //两者二选一
+//	HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_4);
 	
 	HAL_TIMEx_PWMN_Start(&htim1,TIM_CHANNEL_1);
 	HAL_TIMEx_PWMN_Start(&htim1,TIM_CHANNEL_2);
@@ -62,7 +63,7 @@ void Start_Init(void)
 */
 
 /*
-Timer1的通道4中断选择，可以在这个中断里面拉高引脚电平，在ADC注入中断拉低来查看电流采样所需时间是否正确
+Timer1的通道4中断选择，可以在这个中断里面拉高引脚电平，在ADC注入中断拉低来查看电流采样所需时间是否正确，需要先开启中断
 	1.如果 CH4 继续用 PWM 方式（现在是 PWM2 no output），用
 	HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_4);
 	对应回调一般是void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)。

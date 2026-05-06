@@ -1,0 +1,23 @@
+T68C4 001:731.296   SEGGER J-Link V7.82 Log File
+T68C4 001:735.875   DLL Compiled: Oct 13 2022 13:32:51
+T68C4 001:735.979   Logging started @ 2026-05-06 12:14
+T68C4 001:736.064 - 1736.103ms
+T68C4 001:736.348 JLINK_SetWarnOutHandler(...)
+T68C4 001:736.670 - 0.362ms
+T68C4 001:736.753 JLINK_OpenEx(...)
+T68C4 001:740.559   
+  ***** Error: 
+T68C4 001:740.716   Cannot connect to J-Link.
+T68C4 001:767.360 - 30.672ms returns "Cannot connect to J-Link."
+T68C4 001:767.817 
+  ***** 
+T68C4 001:768.034 API Error: API JLINK_GetHardwareVersion function called before JLINKARM_Open()
+T68C4 001:768.194 JLINK_GetHardwareVersion()
+T68C4 001:769.696   
+  ***** Error: 
+T68C4 001:769.856   Cannot connect to J-Link.
+T68C4 001:796.735 - 28.861ms
+T68C4 002:816.246 JLINK_Close()
+T68C4 002:816.503 - 0.285ms
+T68C4 002:816.575   
+T68C4 002:816.673   Closed

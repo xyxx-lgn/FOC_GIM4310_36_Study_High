@@ -57,7 +57,6 @@
 #include "type.h"
 
 extern ADC_HandleTypeDef hadc1;
-extern TIM_HandleTypeDef htim6;
 extern uint16_t ADC1InjectDate[4];     //注入组采样数组
 
 /* USER CODE END 0 */
@@ -224,9 +223,17 @@ void TIM7_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 
+//void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
+//{
+//	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_SET);
+//	
+//}
+
 //注入组ADC采样中断回调
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+	
+	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET);
   //ADC采样 ABC相电流和母线电压
   ADC1InjectDate[0] = hadc->Instance->JDR1;    //A相电流
   ADC1InjectDate[1] = hadc->Instance->JDR2;    //B相电流

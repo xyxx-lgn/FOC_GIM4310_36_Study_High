@@ -1,7 +1,11 @@
-﻿#ifndef __USERMAIN_H
+#ifndef __USERMAIN_H
 #define __USERMAIN_H
 
+#include "type.h"
+
+
 void Data_Init(void);
+void ADC_Task(ADCTask_Param* adctask_param,uint16_t* adc_raw);
 void usermain(void);
 
 #endif

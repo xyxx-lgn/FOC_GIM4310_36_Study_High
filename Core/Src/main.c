@@ -20,6 +20,7 @@
 #include "main.h"
 #include "adc.h"
 #include "cordic.h"
+#include "spi.h"
 #include "tim.h"
 #include "gpio.h"
 
@@ -52,6 +53,11 @@
 
 Motor_Param motor_param;       //电机参数结构体
 SPWM_Param spwm_param;         //SPWM生成的过程参数
+ADCTask_Param adctask_param;   //ADC采样任务参数
+Motor_Flag motor_flag;         //电机标志位结构体
+
+
+
 uint16_t ADC1InjectDate[4];    //注入组采样数组
 
 
@@ -100,6 +106,7 @@ int main(void)
   MX_CORDIC_Init();
   MX_ADC1_Init();
   MX_TIM1_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
   Start_Init();    //外设初始化

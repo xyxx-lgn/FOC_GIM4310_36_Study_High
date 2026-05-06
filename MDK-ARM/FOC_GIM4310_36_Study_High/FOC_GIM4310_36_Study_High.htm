@@ -3,7 +3,7 @@
 <title>Static Call Graph - [FOC_GIM4310_36_Study_High\FOC_GIM4310_36_Study_High.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image FOC_GIM4310_36_Study_High\FOC_GIM4310_36_Study_High.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060750: Last Updated: Wed May 06 15:28:58 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060750: Last Updated: Wed May 06 19:46:15 2026
 <BR><P>
 <H3>Maximum Stack Usage =        272 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -543,7 +543,7 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32g431xx.o(RESET)
 </UL>
-<P><STRONG><a name="[b6]"></a>Data_Init</STRONG> (Thumb, 54 bytes, Stack size 0 bytes, usermain.o(i.Data_Init))
+<P><STRONG><a name="[b6]"></a>Data_Init</STRONG> (Thumb, 96 bytes, Stack size 0 bytes, usermain.o(i.Data_Init))
 <BR><BR>[Called By]<UL><LI><a href="#[b4]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Start_Init
 </UL>
 
@@ -589,9 +589,9 @@ Global Symbols
 <P><STRONG><a name="[73]"></a>HAL_ADC_Init</STRONG> (Thumb, 466 bytes, Stack size 24 bytes, stm32g4xx_hal_adc.o(i.HAL_ADC_Init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 184<LI>Call Chain = HAL_ADC_Init &rArr; HAL_ADC_MspInit &rArr; HAL_GPIO_Init
 </UL>
-<BR>[Calls]<UL><LI><a href="#[75]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LL_ADC_REG_IsConversionOngoing
+<BR>[Calls]<UL><LI><a href="#[74]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_ADC_MspInit
+<LI><a href="#[75]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LL_ADC_REG_IsConversionOngoing
 <LI><a href="#[76]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LL_ADC_INJ_IsConversionOngoing
-<LI><a href="#[74]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_ADC_MspInit
 </UL>
 <BR>[Called By]<UL><LI><a href="#[af]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;MX_ADC1_Init
 </UL>
@@ -974,7 +974,7 @@ Global Symbols
 <P><STRONG><a name="[8]"></a>SVC_Handler</STRONG> (Thumb, 2 bytes, Stack size 0 bytes, stm32g4xx_it.o(i.SVC_Handler))
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32g431xx.o(RESET)
 </UL>
-<P><STRONG><a name="[b4]"></a>Start_Init</STRONG> (Thumb, 108 bytes, Stack size 8 bytes, start_init.o(i.Start_Init))
+<P><STRONG><a name="[b4]"></a>Start_Init</STRONG> (Thumb, 100 bytes, Stack size 8 bytes, start_init.o(i.Start_Init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 56<LI>Call Chain = Start_Init &rArr; HAL_ADCEx_InjectedStart &rArr; ADC_Enable
 </UL>
 <BR>[Calls]<UL><LI><a href="#[ac]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_TIM_PWM_Start

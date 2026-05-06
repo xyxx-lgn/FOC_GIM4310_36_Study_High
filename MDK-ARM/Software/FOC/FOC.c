@@ -1,4 +1,4 @@
-﻿#include "FOC.h"
+#include "FOC.h"
 
 #define _1_sqrt3  0.5773502691896258f
 
