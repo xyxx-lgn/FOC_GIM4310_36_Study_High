@@ -1,8 +1,10 @@
-﻿#ifndef __FOC_H
+#ifndef __FOC_H
 #define __FOC_H
 
 #include "type.h"
 
-void Set_SPWM(SPWM_Param* spwm_param);
+float Angle_Limit(float input_angle,float limit);
+void Set_SPWM(float Uq,float Ud,SPWM_Param* spwm_param);
+void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param);
 
 #endif

@@ -1,12 +1,13 @@
 #include "FOC.h"
 
-#define _1_sqrt3  0.5773502691896258f
+
 
 extern SPWM_Param spwm_param;         //SPWM生成的过程参数
 extern SVPWM_Param svpwm_param;        //SPWM生成的过程参数
+extern EncoderTask_Param encodertask_param;  //编码器任务结构体
 
 //角度限幅处理,将角度限幅到[-limit,limit)
-static float Angle_Limit(float input_angle,float limit)   //耗时510ns
+float Angle_Limit(float input_angle,float limit)   //耗时510ns
 {
 	float _2_limit = 2.0f*limit;
 	//常见小越界，通过加减解决
@@ -29,25 +30,14 @@ static float Angle_Limit(float input_angle,float limit)   //耗时510ns
 	return input_angle;
 }
 
-void Set_SPWM(SPWM_Param* spwm_param)     //耗时3.2us
+void Set_SPWM(float Uq,float Ud,SPWM_Param* spwm_param)     //耗时3.2us
 {
-	float sin_dsp,cos_dsp;
-	//VF拖动自增补偿计算
-	spwm_param->virtual_step = spwm_param->Uq*spwm_param->vf_k;  //VF强托系数，即step = k*Uq
-	
-	//虚拟角度自增  20K的执行频率
-	spwm_param->virtual_angle += spwm_param->virtual_step;    //14极对数，360/20000*14 = 0.252
-	spwm_param->virtual_angle = Angle_Limit(spwm_param->virtual_angle,180.0f);
-	
-	//注意arm_sin_cos_f32这个函数，角度传参是角度值  ，arm_sin_f32和arm_cos_f32传参是弧度值
-	arm_sin_cos_f32(spwm_param->virtual_angle,&sin_dsp,&cos_dsp);        //DSP库计算三角，在电流环帕克变换处计算一次即可
-	
 	//帕克逆变化
-	arm_inv_park_f32(spwm_param->Ud,spwm_param->Uq,&spwm_param->Ualpha,&spwm_param->Ubeta,sin_dsp,cos_dsp);
+	arm_inv_park_f32(Ud,Uq,&spwm_param->Ualpha,&spwm_param->Ubeta,encodertask_param.sin_dsp,encodertask_param.cos_dsp);
 	
 	//克拉克逆变化
-    float Ua = spwm_param->Ualpha;
-    float Ub = -0.5f * spwm_param->Ualpha + 0.8660254039f * spwm_param->Ubeta;
+  float Ua = spwm_param->Ualpha;
+  float Ub = -0.5f * spwm_param->Ualpha + 0.8660254039f * spwm_param->Ubeta;
 	float Uc = -0.5f * spwm_param->Ualpha +- 0.8660254039f * spwm_param->Ubeta;
 	
 	float half_Udc = spwm_param->supply_Udc*0.5f;
@@ -71,16 +61,85 @@ void Set_SPWM(SPWM_Param* spwm_param)     //耗时3.2us
 
 void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param)
 {
+	const float sqrt3     = 1.73205080757f;
+	const float _1_sqrt3  = 0.5773502691896258f;
+	
+	float Ualpha,Ubeta;
+	
+	//1、先求三角函数值
 	float sin_dsp,cos_dsp;
 	arm_sin_cos_f32(ElectAngle,&sin_dsp,&cos_dsp);        //角度传参为角度值,求解三角函数值
 	
-	float gain = svpwm_param->Udc*_1_sqrt3;                              //先标幺化处理
-	float Umax = svpwm_param->Udc * _1_sqrt3;   //判断电压矢量是否超出Udc/sqrt3
-	
-	
-	float Ualpha,Ubeta;
-	//反帕克变化，将Uq，Ud ->Ualpha，Ubeta
+	//2、反帕克变化，将Uq，Ud ->Ualpha，Ubeta
 	arm_inv_park_f32(Ud,Uq,&Ualpha,&Ubeta,sin_dsp,cos_dsp);
 	
+	//3、线性圆限幅，最大相电压 = Udc/√3
+	float Umax = svpwm_param->Udc * _1_sqrt3;   //判断电压矢量是否超出Udc/sqrt3
+	float Uqd2 = Ualpha*Ualpha+Ubeta*Ubeta;
+	if(Uqd2>Umax*Umax)
+	{
+		float k = Umax / sqrtf(Uqd2);
+		Ualpha *= k;
+		Ubeta *= k;
+	}
 	
+	//4、时间定标，将电压映射到时间
+	//最大相电压 = Udc/√3 ，电压 × 系数 = 时间，系数 = Ts / (Udc/√3) = √3 × Ts / Udc
+	float gain = sqrt3 * (float)svpwm_param->Ts / svpwm_param->Udc;     //先标幺化处理
+	Ualpha *= gain;
+	Ubeta *= gain;
+	
+	//5、扇区判断
+	uint8_t A = (Ubeta>0.0f) ? 1 : 0;
+	uint8_t B = ((sqrt3*Ualpha-Ubeta)>0.0f) ? 1 : 0;
+	uint8_t C = ((-sqrt3*Ualpha-Ubeta)>0.0f) ? 1 : 0;
+	uint8_t N = ((C << 2) | (B << 1) | A);
+	
+	//6、矢量作用时间T1、T2；X、Y、Z计算与分配
+	float X = Ubeta;
+	float Y = sqrt3*0.5f*Ualpha + 0.5f*Ubeta;
+	float Z = -sqrt3*0.5f*Ualpha + 0.5f*Ubeta;
+	
+	float T1 = 0.0f,T2 = 0.0f;
+	switch(N)//扇区1-6对应编码值N为3、1、5、4、6、2
+	{
+		case 1: T1 = Z;T2 = Y;break;
+		case 2: T1 = Y;T2 = -X;break;
+		case 3: T1 = -Z;T2 = X;break;
+		case 4: T1 = -X;T2 = Z;break;
+		case 5: T1 = X;T2 = -Y;break;
+		case 6: T1 = -Y;T2 = -Z;break;
+	}
+	
+	//7、过调制保护，确保T1+T2 <= Ts
+	if((T1+T2)>svpwm_param->Ts)
+	{
+		float Ts_k = (float)svpwm_param->Ts / (T1+T2);
+		T1 *= Ts_k;
+		T2 *= Ts_k;
+	}
+	
+	//8、计算并映射三通道Ta、Tb、Tc三通道比较值
+	float Ta = (svpwm_param->Ts - T1 - T2)*0.25f;  //T0 = Ts - T1 - T2
+	float Tb = Ta + 0.5f*T1;
+	float Tc = Tb + 0.5f*T2;
+	
+	float ccrA,ccrB,ccrC;
+	switch(N)//扇区1-6对应编码值N为3、1、5、4、6、2
+	{
+		case 1: ccrA = Tb;ccrB = Ta;ccrC = Tc;break;
+		case 2: ccrA = Ta;ccrB = Tc;ccrC = Tb;break;
+		case 3: ccrA = Ta;ccrB = Tb;ccrC = Tc;break;
+		case 4: ccrA = Tc;ccrB = Tb;ccrC = Ta;break;
+		case 5: ccrA = Tc;ccrB = Ta;ccrC = Tb;break;
+		case 6: ccrA = Tb;ccrB = Tc;ccrC = Ta;break;
+		default:
+			ccrA=ccrB=ccrC = svpwm_param->Ts/4;   //2100/4200，等于50%占空比
+			break;
+	}
+	
+	//输出到定时器PWM的寄存器通道
+	TIM1->CCR1 = (uint32_t)ccrA;
+	TIM1->CCR2 = (uint32_t)ccrB;
+	TIM1->CCR3 = (uint32_t)ccrC;
 }

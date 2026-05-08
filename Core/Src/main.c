@@ -51,11 +51,12 @@
 
 /* USER CODE BEGIN PV */
 
-Motor_Param motor_param;       //电机参数结构体
-SPWM_Param spwm_param;         //SPWM生成的过程参数
-ADCTask_Param adctask_param;   //ADC采样任务参数
-Motor_Flag motor_flag;         //电机标志位结构体
-
+Motor_Param motor_param;              //电机参数结构体
+SPWM_Param spwm_param;                //SPWM生成的过程参数
+ADCTask_Param adctask_param;          //ADC采样任务参数
+EncoderTask_Param encodertask_param;  //编码器任务结构体
+Motor_Flag motor_flag;                //电机标志位结构体
+SVPWM_Param svpwm_param;              //SPWM生成的过程参数
 
 
 uint16_t ADC1InjectDate[4];    //注入组采样数组

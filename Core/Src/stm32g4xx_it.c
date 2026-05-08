@@ -62,6 +62,7 @@ extern uint16_t ADC1InjectDate[4];     //注入组采样数组
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern ADC_HandleTypeDef hadc1;
 extern TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN EV */
@@ -207,6 +208,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles ADC1 and ADC2 global interrupt.
+  */
+void ADC1_2_IRQHandler(void)
+{
+  /* USER CODE BEGIN ADC1_2_IRQn 0 */
+
+  /* USER CODE END ADC1_2_IRQn 0 */
+  HAL_ADC_IRQHandler(&hadc1);
+  /* USER CODE BEGIN ADC1_2_IRQn 1 */
+
+  /* USER CODE END ADC1_2_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM7 global interrupt.
   */
 void TIM7_IRQHandler(void)
@@ -223,9 +238,11 @@ void TIM7_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 
+//Timer1的通道4中断回调，可以查看电流采样时间：2.27us 理论值为：4*（6.5+12.5）*（1/42M）=1.809us
 //void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 //{
-//	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_SET);
+//	if(htim->Instance ==  TIM1 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4) //必须加这个判断，否则示波器上显示不正确
+//		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_SET);
 //	
 //}
 
@@ -233,7 +250,7 @@ void TIM7_IRQHandler(void)
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
 	
-	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET);
   //ADC采样 ABC相电流和母线电压
   ADC1InjectDate[0] = hadc->Instance->JDR1;    //A相电流
   ADC1InjectDate[1] = hadc->Instance->JDR2;    //B相电流

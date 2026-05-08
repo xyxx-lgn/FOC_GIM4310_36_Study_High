@@ -32,12 +32,14 @@ foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/st
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_flash_ramfunc.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_pwr.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_pwr_ex.h
+foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_spi.h
+foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_spi_ex.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Core/Inc/stm32g4xx_it.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Core/Inc/tim.h
-foc_gim4310_36_study_high\stm32g4xx_it.o: .\Software\Usermain\usermain.h
-foc_gim4310_36_study_high\stm32g4xx_it.o: .\Software\type.h
+foc_gim4310_36_study_high\stm32g4xx_it.o: ./Software/Usermain/usermain.h
+foc_gim4310_36_study_high\stm32g4xx_it.o: ./Software/type.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: ../Middlewares/ST/ARM/DSP/Inc/arm_math.h
 foc_gim4310_36_study_high\stm32g4xx_it.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

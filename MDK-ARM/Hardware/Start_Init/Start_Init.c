@@ -19,7 +19,7 @@ void Start_Init(void)
 	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_3);
-//	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_4);            //两者二选一
+	HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_4);            //两者二选一
 //	HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_4);
 	
 	HAL_TIMEx_PWMN_Start(&htim1,TIM_CHANNEL_1);
@@ -33,7 +33,7 @@ void Start_Init(void)
 	
 	
 	//2.ADC1初始化，开启注入组采样，用于电流采样和母线电压采样
-	/*
+	/*FOC_GIM4310_36_Study_High
 		ADC_IT_JEOC   每个注入 rank 完成就可触发,我这里4个通道，不合适、
 		ADC_IT_JEOS   整个注入序列（4个都完）才触发一次
 	*/
