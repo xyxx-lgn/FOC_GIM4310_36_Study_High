@@ -59,7 +59,7 @@ void Set_SPWM(float Uq,float Ud,SPWM_Param* spwm_param)     //耗时3.2us
 }
 
 
-void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param)
+void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param) //用时3.3us
 {
 	const float sqrt3     = 1.73205080757f;
 	const float _1_sqrt3  = 0.5773502691896258f;

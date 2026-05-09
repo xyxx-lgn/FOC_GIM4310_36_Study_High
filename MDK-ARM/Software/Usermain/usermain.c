@@ -2,6 +2,7 @@
 #include "MT6701.h"
 #include "FOC.h"
 #include "MT6701.h"
+#include "PID.h"
 
 extern TIM_HandleTypeDef htim1;
 
@@ -11,6 +12,8 @@ extern ADCTask_Param adctask_param;          //ADC采样任务参数
 extern EncoderTask_Param encodertask_param;  //编码器任务结构体
 extern Motor_Flag motor_flag;                //电机标志位结构体
 extern SVPWM_Param svpwm_param;              //SPWM生成的过程参数
+extern PID_Param pid_param;                  //PID参数结构体
+
 
 extern uint16_t ADC1InjectDate[4];     //注入组采样数组
 
@@ -19,13 +22,16 @@ void Data_Init()
 	//电机参数结构体
 	motor_param.supply_Udc = 24.0f;       //供电电压
 	motor_param.pole = 14;                //电机极对数
+	motor_param.motor_gear=36.0f;         	 //电机减速比
+	motor_param.motor_phaseL=0.00075f;      //电机相电感
+	motor_param.motor_phaseR=1.89f;         //电机相电阻
 	motor_param.Tpwm = 8400;              //定时器计数最大值
-	motor_param.Rs = 0.005;               //采样电阻值大小
+	motor_param.Rs = 0.01;               //采样电阻值大小
 	motor_param.Gain = 50;                //运算放大器增益
 	
 	//电机运行标志位结构体
 	motor_flag.Zero_Flag = 1;             //默认零偏校准标志位为1，避免每次启动都校准
-	motor_flag.Econder_Mode = 1;          //编码器模式，1为开环自增角度，2为闭环真实角度
+	motor_flag.Econder_Mode = 2;          //编码器模式，1为开环自增角度，2为闭环真实角度
 	
 	//SPWM生成的过程参数
 	spwm_param.supply_Udc = motor_param.supply_Udc;      //SPWM电压抬升
@@ -43,10 +49,15 @@ void Data_Init()
 	
 	//Encoder编码器任务参数
 	encodertask_param.motordir = 0;
-	encodertask_param.Zero_Angle = 0.0f;
+	encodertask_param.Zero_Angle = 14.5898f;                    //14.5898f
 	encodertask_param.virtual_step = 0.252f;                    //自增步长，14极对数，360/20000*14 = 0.252相当于1圈每秒
-	encodertask_param.vf_v = 1.0f;                              //VF强托系数里面的V
+	encodertask_param.vf_v = 0.4f;                              //VF强托系数里面的V
 	encodertask_param.vf_k = 0.252f;                            //VF强托系数，即Uq = k*F; 得到step = k*Uq
+	
+	//PID参数
+	pid_param.Iqd_Max = 2.97; //电流限幅3.3A*0.9，大于这个值会削顶（1.65/50/0.01 = 3.3A）
+	pid_param.Ki_I_SumMax = 0.9f*motor_param.supply_Udc/sqrtf(3);   //最大矢量圆限幅，给90%控制裕度 
+
 }
 
 void ADC_Task(ADCTask_Param* adctask_param,uint16_t* adc_raw)
@@ -77,12 +88,15 @@ void ADC_Task(ADCTask_Param* adctask_param,uint16_t* adc_raw)
 	//4、进行三相电流校准(母线电压正常时才进行电流计算，只要母线电压异常就重新校准)
 	if(motor_flag.Adc_OffectOver_Flag == 0 && motor_flag.Error_Flag != 1 && motor_flag.Error_Flag != 2)
 	{
-		//进行10k次校准，用时0.5s
-		if(adctask_param->Iadc_offect_counts<10000)
+		//进行20k次校准，用时1.0s
+		if(adctask_param->Iadc_offect_counts<20000)
 		{
-			adctask_param->Ia_offect = adctask_param->Ia_offect*0.95f + adctask_param->Ia_Sample*0.05f;
-			adctask_param->Ib_offect = adctask_param->Ib_offect*0.95f + adctask_param->Ib_Sample*0.05f;
-			adctask_param->Ic_offect = adctask_param->Ic_offect*0.95f + adctask_param->Ic_Sample*0.05f;
+			if(fabs(adctask_param->Ia_Sample-1.65f)<0.3f)
+				adctask_param->Ia_offect = adctask_param->Ia_offect*0.95f + adctask_param->Ia_Sample*0.05f;
+			if(fabs(adctask_param->Ib_Sample-1.65f)<0.3f)
+				adctask_param->Ib_offect = adctask_param->Ib_offect*0.95f + adctask_param->Ib_Sample*0.05f;
+			if(fabs(adctask_param->Ic_Sample-1.65f)<0.3f)
+				adctask_param->Ic_offect = adctask_param->Ic_offect*0.95f + adctask_param->Ic_Sample*0.05f;
 		}
 		else
 		{ 
@@ -131,19 +145,20 @@ void Encoder_Task(EncoderTask_Param* encodertask_param)
 	encodertask_param->Elect_Angle = Angle_Limit(encodertask_param->Shaft_Angle * (float)motor_param.pole,180.0f);
 	
 	//3、零偏校准程序
-	if(motor_flag.Zero_Flag == 0)
+	if(motor_flag.Zero_Flag == 0 && motor_flag.Adc_OffectOver_Flag == 1)
 	{
-		Set_Svpwm(0,0.5f,0,&svpwm_param);
-		if(encodertask_param->Zero_counts>20000)
+		Set_Svpwm(0,1.0f,0,&svpwm_param);
+		if(encodertask_param->Zero_counts>=20000)
 		{
 			if(encodertask_param->Zero_counts<21000)
 			{
-				encodertask_param->Zero_Angle += encodertask_param->Shaft_Angle;
+				encodertask_param->Zero_Angle_Sum += encodertask_param->Shaft_Angle;
 			}
 			else
 			{
-				encodertask_param->Zero_Angle /= 1000;
 				motor_flag.Zero_Flag = 1;
+				encodertask_param->Zero_Angle = encodertask_param->Zero_Angle_Sum/1000;
+				encodertask_param->Zero_counts = 0;
 			}
 		}			
 		encodertask_param->Zero_counts++;
@@ -167,6 +182,27 @@ void Encoder_Task(EncoderTask_Param* encodertask_param)
 	arm_sin_cos_f32(encodertask_param->Return_Angle,&encodertask_param->sin_dsp,&encodertask_param->cos_dsp);  //DSP库计算三角，在电流环帕克变换处计算一次即可
 }
 
+//电机运行模式任务
+void Mode_Task()
+{
+	if(motor_flag.Mode_Select == 1)       //SPWM运行模式
+	{
+		//虚拟自增角度，使用SPWM强驱电机旋转
+		motor_flag.Econder_Mode = 1;
+		Set_SPWM(encodertask_param.vf_v,0,&spwm_param);
+	}
+	else if(motor_flag.Mode_Select == 2)  //SVPWM运行模式
+	{
+		motor_flag.Econder_Mode = 1;
+		Set_Svpwm(encodertask_param.vf_v,0,encodertask_param.Return_Angle,&svpwm_param);   //用时3.3us
+	}
+	else if(motor_flag.Mode_Select == 3)  //电流环运行模式
+	{
+		motor_flag.Econder_Mode = 2;
+		PID_I_Control(&pid_param);
+	}
+}
+
 //20kHz运行
 void usermain()
 {
@@ -184,13 +220,13 @@ void usermain()
 		__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_2,2100);
 		__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_3,2100);
 	}
-	else if(motor_flag.Adc_OffectOver_Flag == 1)  //电压电流没问题再进行后续操作
+	else if(motor_flag.Adc_OffectOver_Flag == 1 && motor_flag.Zero_Flag == 1)  //电压电流没问题再进行后续操作
 	{
-		//虚拟自增角度，使用SPWM强驱电机旋转
-//		Set_SPWM(encodertask_param.vf_v,0,&spwm_param);
-		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_SET);
-		Set_Svpwm(encodertask_param.vf_v,0,encodertask_param.Return_Angle,&svpwm_param);   //用时3.3us
-		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET);
+		Mode_Task();
+
+//		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_SET);
+
+//		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET);
 	}
 	
 }

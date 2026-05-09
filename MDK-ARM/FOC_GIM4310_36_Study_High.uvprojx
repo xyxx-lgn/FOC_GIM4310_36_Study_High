@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G431xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;./Hardware;./Software;./Hardware/Start_Init;./Software/FOC;./Software/Usermain;./Hardware/MT6701</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;./Hardware;./Software;./Hardware/Start_Init;./Software/FOC;./Software/Usermain;./Hardware/MT6701;.\Software\PID</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -519,6 +519,16 @@
               <FileName>FOC.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Software\FOC\FOC.h</FilePath>
+            </File>
+            <File>
+              <FileName>PID.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Software\PID\PID.c</FilePath>
+            </File>
+            <File>
+              <FileName>PID.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Software\PID\PID.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -770,9 +780,6 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>::CMSIS</GroupName>
-        </Group>
-        <Group>
           <GroupName>Middlewares/Library/DSP Library/DSP Library</GroupName>
           <GroupOption>
             <CommonProperty>
@@ -869,6 +876,9 @@
               </FileOption>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
     </Target>

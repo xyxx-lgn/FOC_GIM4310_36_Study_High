@@ -38,6 +38,7 @@ void Start_Init(void)
 		ADC_IT_JEOS   整个注入序列（4个都完）才触发一次
 	*/
 	__HAL_ADC_ENABLE_IT(&hadc1,ADC_IT_JEOS);    //ADC注入通道中断    //还需要在it.c里面打开HAL_ADCEx_InjectedConvCpltCallback中断读取
+	HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);   //ADC内部增益校准
 	HAL_ADCEx_InjectedStart(&hadc1);            //开启ADC注入采样
 	
 
