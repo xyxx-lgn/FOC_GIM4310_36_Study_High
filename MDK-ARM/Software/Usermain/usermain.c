@@ -20,18 +20,24 @@ extern uint16_t ADC1InjectDate[4];     //注入组采样数组
 void Data_Init()
 {
 	//电机参数结构体
-	motor_param.supply_Udc = 24.0f;       //供电电压
-	motor_param.pole = 14;                //电机极对数
-	motor_param.motor_gear=36.0f;         	 //电机减速比
-	motor_param.motor_phaseL=0.00075f;      //电机相电感
-	motor_param.motor_phaseR=1.89f;         //电机相电阻
-	motor_param.Tpwm = 8400;              //定时器计数最大值
-	motor_param.Rs = 0.01;               //采样电阻值大小
-	motor_param.Gain = 50;                //运算放大器增益
+	motor_param.supply_Udc = 24.0f;                   //供电电压
+	motor_param.pole = 14;                            //电机极对数
+	motor_param.motor_gear=36.0f;         	          //电机减速比
+	motor_param.motor_phaseL=0.00075f;                //电机相电感
+	motor_param.motor_phaseR=1.89f;                   //电机相电阻
+	motor_param.motor_Ld = motor_param.motor_phaseL;  //电机d轴电感
+	motor_param.motor_Lq = motor_param.motor_phaseL;  //电机q轴电感
+	motor_param.motor_filed_link = 0.0f;              //永磁体磁链大小，还未测量
+	motor_param.Tpwm = 8400;                          //定时器计数最大值
+	motor_param.Rs = 0.01;                            //采样电阻值大小
+	motor_param.Gain = 50;                            //运算放大器增益
+
 	
 	//电机运行标志位结构体
-	motor_flag.Zero_Flag = 1;             //默认零偏校准标志位为1，避免每次启动都校准
-	motor_flag.Econder_Mode = 2;          //编码器模式，1为开环自增角度，2为闭环真实角度
+	motor_flag.Zero_Flag = 1;                          //默认零偏校准标志位为1，避免每次启动都校准
+	motor_flag.Econder_Mode = 2;                       //编码器模式，1为开环自增角度，2为闭环真实角度
+	motor_flag.v_limit_mode = V_LIMIT_VECTOR;          //3种电压限幅，分别为q轴优先，d轴优先，等比例限幅
+	motor_flag.dec_mode = FOC_CC_DECOUPLING_DISABLED;  //电流环前馈补偿选择，分别为不补偿，dq轴补偿，反电动势补偿，都补偿
 	
 	//SPWM生成的过程参数
 	spwm_param.supply_Udc = motor_param.supply_Udc;      //SPWM电压抬升
@@ -48,6 +54,7 @@ void Data_Init()
 	adctask_param.IGain = motor_param.Rs*motor_param.Gain;
 	
 	//Encoder编码器任务参数
+	encodertask_param.Encoder_Max = 16384;    //编码器最大值，14位磁编最大值16384
 	encodertask_param.motordir = 0;
 	encodertask_param.Zero_Angle = 14.5898f;                    //14.5898f
 	encodertask_param.virtual_step = 0.252f;                    //自增步长，14极对数，360/20000*14 = 0.252相当于1圈每秒
@@ -137,7 +144,12 @@ void ADC_Task(ADCTask_Param* adctask_param,uint16_t* adc_raw)
 void Encoder_Task(EncoderTask_Param* encodertask_param)
 {
 	//1、首先读读取MT6701原始值(用时6.8us)
-	encodertask_param->Encoder_raw = MT6701_ReadRaw();    
+	uint16_t encoder_raw = MT6701_ReadRaw();    
+	if(encodertask_param->motordir == 0) 
+		encodertask_param->Encoder_raw = encoder_raw;
+	else
+		encodertask_param->Encoder_raw = encoder_raw;
+		
 
 	//2、转化角度值，将编码值转化为机械角度、电角度
 		////0.02197265625 = 1/16384*360
@@ -171,6 +183,7 @@ void Encoder_Task(EncoderTask_Param* encodertask_param)
 		encodertask_param->virtual_step = encodertask_param->vf_k*encodertask_param->vf_v;  //VF强托系数，即step = k*Uq
 		//虚拟角度自增  20K的执行频率
 		encodertask_param->Return_Angle = Angle_Limit(encodertask_param->Return_Angle+encodertask_param->virtual_step,180.0f);    //14极对数，360/20000*14 = 0.252
+		encodertask_param->Return_Rads = encodertask_param->Return_Angle*0.01745329f;  //将角度值转化为弧度值，1/180*PI = 0.01745329f
 	}
 	else if(motor_flag.Econder_Mode == 2)  //闭环角度处理
 	{
@@ -182,7 +195,7 @@ void Encoder_Task(EncoderTask_Param* encodertask_param)
 	arm_sin_cos_f32(encodertask_param->Return_Angle,&encodertask_param->sin_dsp,&encodertask_param->cos_dsp);  //DSP库计算三角，在电流环帕克变换处计算一次即可
 }
 
-//电机运行模式任务
+//电机运行模式任务         
 void Mode_Task()
 {
 	if(motor_flag.Mode_Select == 1)       //SPWM运行模式
@@ -196,10 +209,18 @@ void Mode_Task()
 		motor_flag.Econder_Mode = 1;
 		Set_Svpwm(encodertask_param.vf_v,0,encodertask_param.Return_Angle,&svpwm_param);   //用时3.3us
 	}
-	else if(motor_flag.Mode_Select == 3)  //电流环运行模式
+	else if(motor_flag.Mode_Select == 3)   //电流环运行模式
 	{
 		motor_flag.Econder_Mode = 2;
 		PID_I_Control(&pid_param);
+	}
+	else if(motor_flag.Mode_Select == 4)   //电流-速度环运行模式
+	{
+		motor_flag.Econder_Mode = 2;
+	}
+	else if(motor_flag.Mode_Select == 5)   //电流-速度-位置环运行模式
+	{
+		motor_flag.Econder_Mode = 2;
 	}
 }
 

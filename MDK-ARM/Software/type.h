@@ -5,7 +5,8 @@
 #include "math.h"
 #include "arm_math.h"         //DSP库头文件
 
-#define PI_F 3.14159265358979323846f
+#define PI_F 3.14159265f
+#define PI2_F 6.283185307f
 
 #define Limit(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
@@ -22,10 +23,30 @@ typedef struct
 	float motor_gear;      //电机减速比
 	float motor_phaseL;    //电机相电感
 	float motor_phaseR;    //电机相电阻
+	float motor_Lq;        //电机q轴电感
+	float motor_Ld;        //电机d轴电感
+	float motor_filed_link;//磁永磁体磁链
 	uint16_t Tpwm;         //定时器计数最大值
 	float Rs;              //采样电阻大小
 	float Gain;            //运放增益大小
 }Motor_Param;  
+
+//dq轴电压限幅策略选择
+typedef enum
+{
+    V_LIMIT_Q_PRIORITY = 0,   //q轴优先
+    V_LIMIT_D_PRIORITY = 1,   //d轴优先
+    V_LIMIT_VECTOR     = 2    //等比例矢量限幅
+}VLimitMode;
+
+//前馈解耦策略选择
+typedef enum
+{
+    FOC_CC_DECOUPLING_DISABLED   = 0,  //不解耦
+    FOC_CC_DECOUPLING_CROSS      = 1,  //只交叉耦合（dq轴电流解耦）
+    FOC_CC_DECOUPLING_BEMF       = 2,  //只反电势
+    FOC_CC_DECOUPLING_CROSS_BEMF = 3   //交叉+反电势
+}FOC_CC_DecouplingMode;    //磁场定向电流控制解耦模式
 
 //电机运行标志位结构体
 typedef struct  //所有标志位默认为0
@@ -35,6 +56,8 @@ typedef struct  //所有标志位默认为0
 	uint8_t Zero_Flag;             //1代表零偏校准完成，默认为1，需要校准时再零偏校准
 	uint8_t Econder_Mode;          //编码器模式，1为开环自增角度，2为闭环真实角度
 	uint8_t Mode_Select;           //电机运行模式选择，1为SPWM运行，2为SVPWM运行，3为电流环运行，4为速度-电流环运行，5为位置-速度-电流环运行
+	VLimitMode v_limit_mode;       //dq轴电压限幅模式选择：1为q轴优先，2为d轴优先，3为等比例限幅
+	FOC_CC_DecouplingMode dec_mode;//电流环前馈控制模式选择，0不补偿，1dq轴解耦，2反电动势补偿，3都补偿
 }Motor_Flag;
 
 
@@ -63,6 +86,7 @@ typedef struct
 
 typedef struct
 {
+	uint16_t Encoder_Max;           //编码器最大值，14位磁编最大值16384
 	uint16_t Encoder_raw;           //编码器原始数据，0-16383
 	uint8_t motordir;               //编码器旋转方向
 	float Shaft_Angle;              //机械角度
@@ -71,6 +95,7 @@ typedef struct
 	float Zero_Angle;               //零偏角度，机械0与电角度0的差值
 	uint16_t Zero_counts;           //零偏校准次数
 	float Return_Angle;             //真实程序使用的角度值
+	float Return_Rads;              //真实使用的弧度值
 	float vf_v;                     //vf强拖的系数v
 	float vf_k;                     //vf系数
 	float virtual_step;             //每次自增的虚拟角度步长
