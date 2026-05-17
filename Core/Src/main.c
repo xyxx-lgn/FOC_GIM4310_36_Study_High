@@ -59,6 +59,10 @@ Motor_Flag motor_flag;                //电机标志位结构体
 SVPWM_Param svpwm_param;              //SPWM生成的过程参数
 PID_Param pid_param;                  //PID参数结构体
 
+RsID_Param rsid_param;                //电阻辨析结构体参数
+
+
+
 uint16_t ADC1InjectDate[4];    //注入组采样数组
 
 

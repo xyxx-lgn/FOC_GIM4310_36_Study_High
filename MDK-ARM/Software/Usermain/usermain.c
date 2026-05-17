@@ -3,6 +3,7 @@
 #include "FOC.h"
 #include "MT6701.h"
 #include "PID.h"
+#include "MotorID.h"
 
 extern TIM_HandleTypeDef htim1;
 
@@ -13,6 +14,7 @@ extern EncoderTask_Param encodertask_param;  //编码器任务结构体
 extern Motor_Flag motor_flag;                //电机标志位结构体
 extern SVPWM_Param svpwm_param;              //SPWM生成的过程参数
 extern PID_Param pid_param;                  //PID参数结构体
+extern RsID_Param rsid_param;                //电阻辨析结构体参数
 
 
 extern uint16_t ADC1InjectDate[4];     //注入组采样数组
@@ -189,6 +191,10 @@ void Encoder_Task(EncoderTask_Param* encodertask_param)
 	{
 		encodertask_param->Return_Angle = encodertask_param->Elect_Angle;
 	}
+	else if(motor_flag.Econder_Mode == 2)  //角度定点模式
+	{
+		encodertask_param->Return_Angle = 0.0f;
+	}
 	
 	//5、计算正余弦值
 	//注意arm_sin_cos_f32这个函数，角度传参是角度值  ，arm_sin_f32和arm_cos_f32传参是弧度值
@@ -221,6 +227,11 @@ void Mode_Task()
 	else if(motor_flag.Mode_Select == 5)   //电流-速度-位置环运行模式
 	{
 		motor_flag.Econder_Mode = 2;
+	}
+	else if(motor_flag.Mode_Select == 6)   //参数辨析模式
+	{ 
+		motor_flag.Econder_Mode = 3;        //角度定点模式
+		RsID_Task(&rsid_param);	            //电阻辨析任务
 	}
 }
 

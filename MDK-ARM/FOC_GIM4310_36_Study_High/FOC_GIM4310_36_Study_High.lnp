@@ -12,6 +12,7 @@
 "foc_gim4310_36_study_high\usermain.o"
 "foc_gim4310_36_study_high\foc.o"
 "foc_gim4310_36_study_high\pid.o"
+"foc_gim4310_36_study_high\motorid.o"
 "foc_gim4310_36_study_high\start_init.o"
 "foc_gim4310_36_study_high\mt6701.o"
 "foc_gim4310_36_study_high\stm32g4xx_hal_adc.o"

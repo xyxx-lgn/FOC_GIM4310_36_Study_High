@@ -5,8 +5,8 @@
 #include "math.h"
 #include "arm_math.h"         //DSP库头文件
 
-#define PI_F 3.14159265f
-#define PI2_F 6.283185307f
+#define PI_F 3.14159265f                
+#define PI2_F 6.283185307f             
 
 #define Limit(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
@@ -34,9 +34,9 @@ typedef struct
 //dq轴电压限幅策略选择
 typedef enum
 {
-    V_LIMIT_Q_PRIORITY = 0,   //q轴优先
-    V_LIMIT_D_PRIORITY = 1,   //d轴优先
-    V_LIMIT_VECTOR     = 2    //等比例矢量限幅
+    V_LIMIT_VECTOR = 0,   //等比例矢量限幅,默认模式
+    V_LIMIT_Q_PRIORITY,   //q轴优先
+    V_LIMIT_D_PRIORITY    //d轴优先
 }VLimitMode;
 
 //前馈解耦策略选择
@@ -113,5 +113,35 @@ typedef struct
 	float Uq,Ud;
 }PID_Param;
 
+//电阻参数辨析状态
+typedef enum
+{
+	RsID_IDLE = 0,           //空闲模式，还未完成初始化,赋值为0，默认为RsID_IDLE，不赋值就会导致为0出错误
+	RsID_Pos_Set,            //正向电压设置，设置完之后要等稳定在进下一个状态采集
+	RsID_Pos_Average,        //正向电压设置后电流平均值采集
+	RsID_Neg_Set,            //反向电压设置，设置完之后要等稳定在进下一个状态采集
+	RsID_Neg_Average,        //反向电压设置后电流平均值采集
+	RsID_Done                //参数辨析完成
+}RsID_State;
+
+//电阻参数辨析结构体参数
+typedef struct
+{
+	RsID_State Rsid_state;    //电阻辨析状态枚举
+	
+	float Ud_Set;             //参数辨析Ud设置值，一般取（1.0-1.5）
+	uint16_t cnt_sum;         //执行状态的累计次数
+	uint16_t wait_cnt;        //等待稳定所花的次数，20k的执行频率，等待1200次，为60ms
+	uint16_t collect_cnt;     //电流稳定后采集的次数，20k执行频率，采集2000次，为100ms
+	uint8_t RsID_Start;       //电阻辨析初始化完成标志位，置1表示初始化完成，下一步开始辨析
+	float lock_angle;         //电机锁定角度，参数辨析时保持在该角度不变
+
+	float Id_collect_sum;     //电流采集累计值
+	float Id_pos_avg;         //正向电流平均值
+	float Id_neg_avg;         //反向电流平均值
+	
+	float Rs_result;          //相电阻测量结果
+	uint8_t Rs_done;          //相电阻辨析结束，1表示结束
+}RsID_Param;
 
 #endif
