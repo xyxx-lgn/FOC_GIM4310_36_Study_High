@@ -29,6 +29,7 @@ typedef struct
 	uint16_t Tpwm;         //定时器计数最大值
 	float Rs;              //采样电阻大小
 	float Gain;            //运放增益大小
+	float I_Width;         //电流环带宽大小
 }Motor_Param;  
 
 //dq轴电压限幅策略选择
@@ -58,6 +59,7 @@ typedef struct  //所有标志位默认为0
 	uint8_t Mode_Select;           //电机运行模式选择，1为SPWM运行，2为SVPWM运行，3为电流环运行，4为速度-电流环运行，5为位置-速度-电流环运行
 	VLimitMode v_limit_mode;       //dq轴电压限幅模式选择：1为q轴优先，2为d轴优先，3为等比例限幅
 	FOC_CC_DecouplingMode dec_mode;//电流环前馈控制模式选择，0不补偿，1dq轴解耦，2反电动势补偿，3都补偿
+	uint8_t pid_param_flag;    
 }Motor_Flag;
 
 
@@ -94,6 +96,7 @@ typedef struct
 	float Zero_Angle_Sum;           //零偏校准角度和
 	float Zero_Angle;               //零偏角度，机械0与电角度0的差值
 	uint16_t Zero_counts;           //零偏校准次数
+	uint16_t Zero_n;                //实际零偏计次次数
 	float Return_Angle;             //真实程序使用的角度值
 	float Return_Rads;              //真实使用的弧度值
 	float vf_v;                     //vf强拖的系数v
@@ -111,6 +114,7 @@ typedef struct
 	float Ki_I_SumMax;
 	float erro_iq_sum,erro_id_sum;
 	float Uq,Ud;
+	float Uout_Max;
 }PID_Param;
 
 //电阻参数辨析状态
@@ -127,6 +131,7 @@ typedef enum
 //电阻参数辨析结构体参数
 typedef struct
 {
+	//Rs电阻辨析
 	RsID_State Rsid_state;    //电阻辨析状态枚举
 	
 	float Ud_Set;             //参数辨析Ud设置值，一般取（1.0-1.5）
@@ -142,6 +147,27 @@ typedef struct
 	
 	float Rs_result;          //相电阻测量结果
 	uint8_t Rs_done;          //相电阻辨析结束，1表示结束
-}RsID_Param;
+	
+	//Ld、Lq电感辨析
+	float Udq_inject;         //相电感Udq注入电压大小
+	float frequency_inject;   //注入方波频率值
+	uint8_t Ldq_select;       //dq轴电感测量，默认为0辨析q轴电感，1辨析d轴电感
+	
+	uint16_t half_cnts;       //半个周期需要计次值
+	uint16_t Ldq_half_cnt;    //半个周期计次值，对比看是否该执行下半个周期
+	uint16_t half_index;      //半个周期计次数，看完成了多少半个周期
+	uint16_t calculate_cnt;   //计算周期总执行次数
+	uint16_t Ldq_cnt;         //实际dq轴半周期计算的完成次数
+	uint16_t LdqID_Start;     //电感辨析初始化完成标志位
+	
+	float i_max,i_min;        //拿半个周期内电流变化率累计求和来求解电感
+	float iavgs_half_sum;     //每半个周期电流平均值
+	float Ldq_sum;            //最终所有半周期计算累计的电感和
+	
+	float Lq_result;          //q轴电感求解值
+	float Ld_result;          //d轴电感求解值
+	uint16_t Ldq_done;        //电感辨析结束标志位
+	
+}MotorID_Param;
 
 #endif

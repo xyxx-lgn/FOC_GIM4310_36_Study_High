@@ -12,6 +12,8 @@
 
 void Start_Init(void)
 {
+
+	
 	//1.定时器1的PWM开启
 	HAL_TIM_Base_Start(&htim1);   //打开定时器1
 	
@@ -30,6 +32,10 @@ void Start_Init(void)
 	__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,2100);   //Duty=4200/8400
 	__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_2,2100);
 	__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_3,2100);
+	
+	
+	//参数初始化
+	Data_Init();
 	
 	
 	//2.ADC1初始化，开启注入组采样，用于电流采样和母线电压采样
@@ -75,9 +81,8 @@ Timer1的通道4中断选择，可以在这个中断里面拉高引脚电平，�
 	
 */
 	
-	
-	//参数初始化
-	Data_Init();
+
+
 }
 
 

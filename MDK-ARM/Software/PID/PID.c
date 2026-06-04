@@ -8,17 +8,6 @@ extern Motor_Flag motor_flag;                //电机标志位结构体
 
 void PID_I_Control(PID_Param* pid_i)
 {
-	//1、克拉克变化和反帕克变化
-	const float _1_sqrt3 = 0.5773502691896258f;  //1/sqrt3
-	const float _2_1_sqrt3 = 1.15470053838f;     //2/sqrt3
-	
-	//(1)克拉克变化（已做过等幅值处理，及乘2/3）Iabc->alhpa、beta
-	float Ialpha = adctask_param.Ia;
-	float Ibeta = _1_sqrt3 * adctask_param.Ia + _2_1_sqrt3 * adctask_param.Ib;
-	
-	//(2)帕克逆变化 alhpa、beta->Iq、Id
-	arm_park_f32(Ialpha,Ibeta,&pid_i->Id_now,&pid_i->Iq_now,encodertask_param.sin_dsp,encodertask_param.cos_dsp);
-	
 	//2、进行电流环Iq、Id限幅
 	pid_i->Iq_aim = Limit(pid_i->Iq_aim,-pid_i->Iqd_Max,pid_i->Iqd_Max); 
 	pid_i->Id_aim = Limit(pid_i->Id_aim,-pid_i->Iqd_Max,pid_i->Iqd_Max);
@@ -27,90 +16,111 @@ void PID_I_Control(PID_Param* pid_i)
 	float erro_iq = pid_i->Iq_aim - pid_i->Iq_now;
 	float erro_id = pid_i->Id_aim - pid_i->Id_now;
 	
-	//4、进行PI积分运算，并限幅，我使用的是离散PI，此处不乘dt，因此Ki值很小，因为乘了dt（相反，连续性的Ki很大，因为积分项乘了dt）
-	pid_i->erro_iq_sum += pid_i->Ki_I*erro_iq;
-	pid_i->erro_id_sum += pid_i->Ki_I*erro_id;
-	
-	pid_i->erro_iq_sum = Limit(pid_i->erro_iq_sum,-pid_i->Ki_I_SumMax,pid_i->Ki_I_SumMax);
-	pid_i->erro_id_sum = Limit(pid_i->erro_id_sum,-pid_i->Ki_I_SumMax,pid_i->Ki_I_SumMax);
+	//4、进行PI积分运算，我使用的是离散PI，此处不乘dt，因此Ki值很小，因为乘了dt（相反，连续性的Ki很大，因为积分项乘了dt）	
+	pid_i->erro_iq_sum += pid_i->Ki_I * erro_iq;
+	pid_i->erro_id_sum += pid_i->Ki_I * erro_id;
 	
 	//5、电流环输出计算
 	float Uq = pid_i->Kp_I*erro_iq + pid_i->erro_iq_sum;
 	float Ud = pid_i->Kp_I*erro_id + pid_i->erro_id_sum;
 	
-	//6、进行前馈补偿，包括dq轴解耦和反电动势补偿  !!!!!!!!!!!!!!!!!!(注意后期需要把这个速度滤波，不然可能会出现补偿进去有噪声)
-	static float last_elect_angle = 0.0f;
-	float now_elect_angle = encodertask_param.Return_Rads;  
-	float elect_erro = (now_elect_angle - last_elect_angle);  
-	//粗略计算一下该电机，额定输出转速40rpm，减速比36，极对数14，执行频率20k
-	//弧度变化值最大为40*36*14*6.28/60/20000 = 0.105504,如果发现特别大则出现过零点
-	if(elect_erro>3.14f)        //反转过零点
-		elect_erro -= PI2_F;
-	else if(elect_erro<-3.14f)  //正转过零点
-		elect_erro += PI2_F;
-	float elect_speed = elect_erro*20000.0f;   //计算电角速度，该电流环执行频率20k，化为rad/s，乘系数20000
-	last_elect_angle = now_elect_angle;
-	
-	//计算前馈补偿项
-	// vd = Rs*id + Ld*did/dt - ωe*iq*Lq
-	// vq = Rs*iq + Lq*diq/dt + ωe*id*Ld + ωe*ψm
-	float dec_vd = elect_speed*pid_i->Iq_now*motor_param.motor_Lq;
-	float dec_vq = elect_speed*pid_i->Id_now*motor_param.motor_Ld;
-	float dec_bemf = elect_speed*motor_param.motor_filed_link;
-	
-	switch(motor_flag.dec_mode)
+	//6、抗积分饱和，如果输出饱和且误差与饱和方向相同，则回退本次积分
+	if ((Uq >= pid_i->Uout_Max && erro_iq > 0.0f) || (Uq <= -pid_i->Uout_Max && erro_iq < 0.0f))     // 停止积分
+  {
+    pid_i->erro_iq_sum -= pid_i->Ki_I * erro_iq;  // 回退
+	}
+	if ((Ud >= pid_i->Uout_Max && erro_id > 0.0f) || (Ud <= -pid_i->Uout_Max && erro_id < 0.0f))      // 停止积分   
 	{
-		case FOC_CC_DECOUPLING_DISABLED:        //不解耦
-			break;
-		case FOC_CC_DECOUPLING_CROSS:           //只交叉耦合（dq轴电流解耦）
-			Ud = Ud-dec_vd;
-			Uq = Uq+dec_vq;
-			break;
-		case FOC_CC_DECOUPLING_BEMF:            //只反电势
-			Uq = Uq+dec_bemf;
-			break;
-		case FOC_CC_DECOUPLING_CROSS_BEMF:      //交叉+反电势
-			Ud = Ud-dec_vd;
-			Uq = Uq+dec_vq+dec_bemf;
-			break;
+		pid_i->erro_id_sum -= pid_i->Ki_I * erro_id; //回退
 	}
 	
-	//7、选择dq轴优先限幅策略：默认等比例限幅
-	/*
-		进行d轴优先限幅（目的：弱磁控制，效率优化）
-		进行q轴优先限幅（目的：确保最大转矩）
-	*/
-	float Umax = pid_i->Ki_I_SumMax;
-	switch(motor_flag.v_limit_mode)
-	{
-		case V_LIMIT_Q_PRIORITY:  //q轴优先
-		{
-			Uq = Limit(Uq,-Umax,Umax);
-			float Ud_m = sqrtf(Umax*Umax - Uq*Uq);
-			Ud = Limit(Ud,-Ud_m,Ud_m);
-			break;
-		}
-		case V_LIMIT_D_PRIORITY:  //d轴优先
-		{
-			Ud = Limit(Ud,-Umax,Umax);
-			float Uq_m = sqrtf(Umax*Umax - Ud*Ud);
-			Uq = Limit(Uq,-Uq_m,Uq_m);
-			break;
-		}
-		case V_LIMIT_VECTOR:      //等比例限幅
-		{
-			float Uqd2 = Uq*Uq + Ud*Ud;
-			if(Uqd2 > Umax*Umax)
-			{
-				float k = Umax/sqrtf(Uqd2);
-				Uq *= k;
-				Ud *= k;
-			}
-			break;
-		}
-	}
-	pid_i->Uq = Uq;
-	pid_i->Ud = Ud;
+	pid_i->erro_iq_sum = Limit(pid_i->erro_iq_sum,-pid_i->Ki_I_SumMax,pid_i->Ki_I_SumMax);
+	pid_i->erro_id_sum = Limit(pid_i->erro_id_sum,-pid_i->Ki_I_SumMax,pid_i->Ki_I_SumMax);
+	
+	Uq = pid_i->Kp_I*erro_iq + pid_i->erro_iq_sum;
+  Ud = pid_i->Kp_I*erro_id + pid_i->erro_id_sum;
+	
+	pid_i->Uq = Limit(Uq,-pid_i->Uout_Max,pid_i->Uout_Max);
+	pid_i->Ud = Limit(Ud,-pid_i->Uout_Max,pid_i->Uout_Max);
+
+	
+//	//6、进行前馈补偿，包括dq轴解耦和反电动势补偿  !!!!!!!!!!!!!!!!!!(注意后期需要把这个速度滤波，不然可能会出现补偿进去有噪声)
+//	if(motor_flag.dec_mode!=FOC_CC_DECOUPLING_DISABLED)
+//	{
+//		static float last_elect_angle = 0.0f;
+//		float now_elect_angle = encodertask_param.Return_Rads;  
+//		float elect_erro = (now_elect_angle - last_elect_angle);  
+//		//粗略计算一下该电机，额定输出转速40rpm，减速比36，极对数14，执行频率20k
+//		//弧度变化值最大为40*36*14*6.28/60/20000 = 0.105504,如果发现特别大则出现过零点
+//		if(elect_erro>3.14f)        //反转过零点
+//			elect_erro -= PI2_F;
+//		else if(elect_erro<-3.14f)  //正转过零点
+//			elect_erro += PI2_F;
+//		float elect_speed = elect_erro*20000.0f;   //计算电角速度，该电流环执行频率20k，化为rad/s，乘系数20000
+//		last_elect_angle = now_elect_angle;
+//		
+//		//计算前馈补偿项
+//		// vd = Rs*id + Ld*did/dt - ωe*iq*Lq
+//		// vq = Rs*iq + Lq*diq/dt + ωe*id*Ld + ωe*ψm
+//		float dec_vd = elect_speed*pid_i->Iq_now*motor_param.motor_Lq;
+//		float dec_vq = elect_speed*pid_i->Id_now*motor_param.motor_Ld;
+//		float dec_bemf = elect_speed*motor_param.motor_filed_link;
+//	
+//		switch(motor_flag.dec_mode)
+//		{
+//			case FOC_CC_DECOUPLING_DISABLED:        //不解耦
+//				break;
+//			case FOC_CC_DECOUPLING_CROSS:           //只交叉耦合（dq轴电流解耦）
+//				Ud = Ud-dec_vd;
+//				Uq = Uq+dec_vq;
+//				break;
+//			case FOC_CC_DECOUPLING_BEMF:            //只反电势
+//				Uq = Uq+dec_bemf;
+//				break;
+//			case FOC_CC_DECOUPLING_CROSS_BEMF:      //交叉+反电势
+//				Ud = Ud-dec_vd;
+//				Uq = Uq+dec_vq+dec_bemf;
+//				break;
+//		}
+//	}
+//	
+//	//7、选择dq轴优先限幅策略：默认等比例限幅
+//	/*
+//		进行d轴优先限幅（目的：弱磁控制，效率优化）
+//		进行q轴优先限幅（目的：确保最大转矩）
+//	*/
+//	float Umax = pid_i->Ki_I_SumMax;
+//	switch(motor_flag.v_limit_mode)
+//	{
+//		case V_LIMIT_Q_PRIORITY:  //q轴优先
+//		{
+//			Uq = Limit(Uq,-Umax,Umax);
+//			float Ud_m = sqrtf(Umax*Umax - Uq*Uq);
+//			Ud = Limit(Ud,-Ud_m,Ud_m);
+//			break;
+//		}
+//		case V_LIMIT_D_PRIORITY:  //d轴优先
+//		{
+//			Ud = Limit(Ud,-Umax,Umax);
+//			float Uq_m = sqrtf(Umax*Umax - Ud*Ud);
+//			Uq = Limit(Uq,-Uq_m,Uq_m);
+//			break;
+//		}
+//		case V_LIMIT_VECTOR:      //等比例限幅
+//		{
+//			float Uqd2 = Uq*Uq + Ud*Ud;
+//			if(Uqd2 > Umax*Umax)
+//			{
+//				float k = Umax/sqrtf(Uqd2);
+//				Uq *= k;
+//				Ud *= k;
+//			}
+//			break;
+//		}
+//	}
+
+	
+	
 }
 
 

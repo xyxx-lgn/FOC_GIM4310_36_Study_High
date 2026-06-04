@@ -3,6 +3,6 @@
 
 #include "type.h"
 
-void RsID_Task(RsID_Param* rsparam);      //相电阻辨析任务
-
+void RsID_Task(MotorID_Param* rsparam);      //相电阻辨析任务
+void LdqID_Task(MotorID_Param* ldqparam);    //相电感辨析任务
 #endif

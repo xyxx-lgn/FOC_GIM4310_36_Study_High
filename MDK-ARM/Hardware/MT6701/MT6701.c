@@ -7,7 +7,7 @@ static const uint8_t tx_buff[2] =  {0xFF,0xFF};
 static void MT6701_Read(uint8_t* data)
 {
 	MT6701_CS_ON();
-	HAL_SPI_TransmitReceive(&hspi1,(uint8_t*)tx_buff,data,2,1);
+	HAL_SPI_TransmitReceive(&hspi1,(uint8_t*)tx_buff,data,2,100);
 	MT6701_CS_OFF();
 }
 

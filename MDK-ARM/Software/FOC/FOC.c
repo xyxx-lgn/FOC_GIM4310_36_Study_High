@@ -1,10 +1,16 @@
 #include "FOC.h"
 
 
-
+extern ADCTask_Param adctask_param;          //ADC采样任务参数
 extern SPWM_Param spwm_param;         //SPWM生成的过程参数
 extern SVPWM_Param svpwm_param;        //SPWM生成的过程参数
 extern EncoderTask_Param encodertask_param;  //编码器任务结构体
+
+
+
+extern uint8_t adc_map[3];
+extern uint8_t pwm_map[3];
+extern int8_t  i_sign[3];
 
 //角度限幅处理,将角度限幅到[-limit,limit)
 float Angle_Limit(float input_angle,float limit)   //耗时510ns
@@ -38,7 +44,7 @@ void Set_SPWM(float Uq,float Ud,SPWM_Param* spwm_param)     //耗时3.2us
 	//克拉克逆变化
   float Ua = spwm_param->Ualpha;
   float Ub = -0.5f * spwm_param->Ualpha + 0.8660254039f * spwm_param->Ubeta;
-	float Uc = -0.5f * spwm_param->Ualpha +- 0.8660254039f * spwm_param->Ubeta;
+	float Uc = -0.5f * spwm_param->Ualpha - 0.8660254039f * spwm_param->Ubeta;
 	
 	float half_Udc = spwm_param->supply_Udc*0.5f;
 	
@@ -53,9 +59,26 @@ void Set_SPWM(float Uq,float Ud,SPWM_Param* spwm_param)     //耗时3.2us
 	float Tc = (spwm_param->Uc/spwm_param->supply_Udc)*(float)spwm_param->Tpwm;
 	
 	//输出到定时器PWM的寄存器通道
-	TIM1->CCR1 = (uint32_t)Ta;
-	TIM1->CCR2 = (uint32_t)Tb;
-	TIM1->CCR3 = (uint32_t)Tc;
+	TIM1->CCR1 = spwm_param->Tpwm-(uint32_t)Ta;
+	TIM1->CCR2 = spwm_param->Tpwm-(uint32_t)Tb;
+	TIM1->CCR3 = spwm_param->Tpwm-(uint32_t)Tc;
+}
+
+
+
+//通过三相电流，求得实时的Id
+void Getdq(float* Iq,float* Id)
+{
+	//1、克拉克变化和反帕克变化
+	const float _1_sqrt3 = 0.5773502691896258f;  //1/sqrt3
+	const float _2_1_sqrt3 = 1.15470053838f;     //2/sqrt3
+	
+	//(1)克拉克变化（已做过等幅值处理，及乘2/3）Iabc->alhpa、beta
+	float Ialpha = adctask_param.Ia;
+	float Ibeta = _1_sqrt3 * adctask_param.Ia + _2_1_sqrt3 * adctask_param.Ib;
+	
+	//(2)帕克逆变化 alhpa、beta->Iq、Id
+	arm_park_f32(Ialpha,Ibeta,Id,Iq,encodertask_param.sin_dsp,encodertask_param.cos_dsp);
 }
 
 
@@ -72,6 +95,9 @@ void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param) //�
 	
 	//2、反帕克变化，将Uq，Ud ->Ualpha，Ubeta
 	arm_inv_park_f32(Ud,Uq,&Ualpha,&Ubeta,sin_dsp,cos_dsp);
+	
+//	Ualpha = -Ualpha;
+//	Ubeta = -Ubeta; 
 	
 	//3、线性圆限幅，最大相电压 = Udc/√3
 	float Umax = svpwm_param->Udc * _1_sqrt3;   //判断电压矢量是否超出Udc/sqrt3
@@ -138,8 +164,23 @@ void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param) //�
 			break;
 	}
 	
+	ccrA = Limit(ccrA,300,4190);
+	ccrB = Limit(ccrB,300,4190);
+	ccrC = Limit(ccrC,300,4190);
+	
 	//输出到定时器PWM的寄存器通道
-	TIM1->CCR1 = (uint32_t)ccrA;
-	TIM1->CCR2 = (uint32_t)ccrB;
-	TIM1->CCR3 = (uint32_t)ccrC;
+//	TIM1->CCR1 = (uint32_t)ccrA;
+//	TIM1->CCR2 = (uint32_t)ccrB;
+//	TIM1->CCR3 = (uint32_t)ccrC;
+	
+	float duty_logic[3] = {ccrA, ccrB, ccrC}; // 逻辑A/B/C
+	uint32_t ccr_out[4] = {0};
+
+	ccr_out[pwm_map[0]] = (uint32_t)duty_logic[0]; // A
+	ccr_out[pwm_map[1]] = (uint32_t)duty_logic[1]; // B
+	ccr_out[pwm_map[2]] = (uint32_t)duty_logic[2]; // C
+
+	TIM1->CCR1 = ccr_out[1];         //输出坐标系校准，通过电流环判定
+	TIM1->CCR2 = ccr_out[2];
+	TIM1->CCR3 = ccr_out[3];
 }

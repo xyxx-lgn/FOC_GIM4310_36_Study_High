@@ -8,7 +8,6 @@
 "foc_gim4310_36_study_high\tim.o"
 "foc_gim4310_36_study_high\stm32g4xx_it.o"
 "foc_gim4310_36_study_high\stm32g4xx_hal_msp.o"
-"foc_gim4310_36_study_high\stm32g4xx_hal_timebase_tim.o"
 "foc_gim4310_36_study_high\usermain.o"
 "foc_gim4310_36_study_high\foc.o"
 "foc_gim4310_36_study_high\pid.o"

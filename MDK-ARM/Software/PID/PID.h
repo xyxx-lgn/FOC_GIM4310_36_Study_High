@@ -3,7 +3,7 @@
 
 #include "type.h"
 
-void PID_I_Control(PID_Param* pid_param);
+void PID_I_Control(PID_Param* pid_i);
 
 
 #endif

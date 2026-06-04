@@ -45,5 +45,5 @@ foc_gim4310_36_study_high\usermain.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\float.
 foc_gim4310_36_study_high\usermain.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\limits.h
 foc_gim4310_36_study_high\usermain.o: ./Hardware/MT6701/MT6701.h
 foc_gim4310_36_study_high\usermain.o: ./Software/FOC/FOC.h
-foc_gim4310_36_study_high\usermain.o: .\Software\PID\PID.h
-foc_gim4310_36_study_high\usermain.o: .\Software\MotorID\MotorID.h
+foc_gim4310_36_study_high\usermain.o: ./Software/PID/PID.h
+foc_gim4310_36_study_high\usermain.o: ./Software/MotorID/MotorID.h
