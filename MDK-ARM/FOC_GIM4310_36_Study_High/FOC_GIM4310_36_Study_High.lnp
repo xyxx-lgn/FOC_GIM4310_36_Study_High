@@ -6,6 +6,7 @@
 "foc_gim4310_36_study_high\cordic.o"
 "foc_gim4310_36_study_high\spi.o"
 "foc_gim4310_36_study_high\tim.o"
+"foc_gim4310_36_study_high\usart.o"
 "foc_gim4310_36_study_high\stm32g4xx_it.o"
 "foc_gim4310_36_study_high\stm32g4xx_hal_msp.o"
 "foc_gim4310_36_study_high\usermain.o"
@@ -35,9 +36,11 @@
 "foc_gim4310_36_study_high\stm32g4xx_hal_spi_ex.o"
 "foc_gim4310_36_study_high\stm32g4xx_hal_tim.o"
 "foc_gim4310_36_study_high\stm32g4xx_hal_tim_ex.o"
+"foc_gim4310_36_study_high\stm32g4xx_hal_uart.o"
+"foc_gim4310_36_study_high\stm32g4xx_hal_uart_ex.o"
 "foc_gim4310_36_study_high\system_stm32g4xx.o"
 "..\Middlewares\ST\ARM\DSP\Lib\arm_cortexM4lf_math.lib"
---strict --scatter "FOC_GIM4310_36_Study_High\FOC_GIM4310_36_Study_High.sct"
+--library_type=microlib --strict --scatter "FOC_GIM4310_36_Study_High\FOC_GIM4310_36_Study_High.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers
 --list "FOC_GIM4310_36_Study_High.map" -o FOC_GIM4310_36_Study_High\FOC_GIM4310_36_Study_High.axf

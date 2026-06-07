@@ -3,7 +3,10 @@
 
 #include "main.h"
 #include "math.h"
-#include "arm_math.h"         //DSPåº“å¤´æ–‡ä»¶
+#include "arm_math.h"         //DSP¿âÍ·ÎÄ¼ş
+#include "usart.h"
+#include <stdio.h>
+
 
 #define PI_F 3.14159265f                
 #define PI2_F 6.283185307f             
@@ -11,98 +14,98 @@
 #define Limit(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
 /*
-å‡½æ•°åŠŸèƒ½:
-	åŒ…å«é€šç”¨å¤´æ–‡ä»¶ï¼Œå¹¶ä¸”å®šä¹‰ç»“æ„ä½“å’Œå…¨å±€å˜é‡
+º¯Êı¹¦ÄÜ:
+	°üº¬Í¨ÓÃÍ·ÎÄ¼ş£¬²¢ÇÒ¶¨Òå½á¹¹ÌåºÍÈ«¾Ö±äÁ¿
 */
 
-//ç”µæœºå‚æ•°ç»“æ„ä½“
+//µç»ú²ÎÊı½á¹¹Ìå
 typedef struct
 {
-	float supply_Udc;      //ä¾›ç”µç”µå‹
-	uint8_t pole;          //ç”µæœºæå¯¹æ•°
-	float motor_gear;      //ç”µæœºå‡é€Ÿæ¯”
-	float motor_phaseL;    //ç”µæœºç›¸ç”µæ„Ÿ
-	float motor_phaseR;    //ç”µæœºç›¸ç”µé˜»
-	float motor_Lq;        //ç”µæœºqè½´ç”µæ„Ÿ
-	float motor_Ld;        //ç”µæœºdè½´ç”µæ„Ÿ
-	float motor_filed_link;//ç£æ°¸ç£ä½“ç£é“¾
-	uint16_t Tpwm;         //å®šæ—¶å™¨è®¡æ•°æœ€å¤§å€¼
-	float Rs;              //é‡‡æ ·ç”µé˜»å¤§å°
-	float Gain;            //è¿æ”¾å¢ç›Šå¤§å°
-	float I_Width;         //ç”µæµç¯å¸¦å®½å¤§å°
+	float supply_Udc;      //¹©µçµçÑ¹
+	uint8_t pole;          //µç»ú¼«¶ÔÊı
+	float motor_gear;      //µç»ú¼õËÙ±È
+	float motor_phaseL;    //µç»úÏàµç¸Ğ
+	float motor_phaseR;    //µç»úÏàµç×è
+	float motor_Lq;        //µç»úqÖáµç¸Ğ
+	float motor_Ld;        //µç»údÖáµç¸Ğ
+	float motor_filed_link;//´ÅÓÀ´ÅÌå´ÅÁ´
+	uint16_t Tpwm;         //¶¨Ê±Æ÷¼ÆÊı×î´óÖµ
+	float Rs;              //²ÉÑùµç×è´óĞ¡
+	float Gain;            //ÔË·ÅÔöÒæ´óĞ¡
+	float I_Width;         //µçÁ÷»·´ø¿í´óĞ¡
 }Motor_Param;  
 
-//dqè½´ç”µå‹é™å¹…ç­–ç•¥é€‰æ‹©
+//dqÖáµçÑ¹ÏŞ·ù²ßÂÔÑ¡Ôñ
 typedef enum
 {
-    V_LIMIT_VECTOR = 0,   //ç­‰æ¯”ä¾‹çŸ¢é‡é™å¹…,é»˜è®¤æ¨¡å¼
-    V_LIMIT_Q_PRIORITY,   //qè½´ä¼˜å…ˆ
-    V_LIMIT_D_PRIORITY    //dè½´ä¼˜å…ˆ
+    V_LIMIT_VECTOR = 0,   //µÈ±ÈÀıÊ¸Á¿ÏŞ·ù,Ä¬ÈÏÄ£Ê½
+    V_LIMIT_Q_PRIORITY,   //qÖáÓÅÏÈ
+    V_LIMIT_D_PRIORITY    //dÖáÓÅÏÈ
 }VLimitMode;
 
-//å‰é¦ˆè§£è€¦ç­–ç•¥é€‰æ‹©
+//Ç°À¡½âñî²ßÂÔÑ¡Ôñ
 typedef enum
 {
-    FOC_CC_DECOUPLING_DISABLED   = 0,  //ä¸è§£è€¦
-    FOC_CC_DECOUPLING_CROSS      = 1,  //åªäº¤å‰è€¦åˆï¼ˆdqè½´ç”µæµè§£è€¦ï¼‰
-    FOC_CC_DECOUPLING_BEMF       = 2,  //åªåç”µåŠ¿
-    FOC_CC_DECOUPLING_CROSS_BEMF = 3   //äº¤å‰+åç”µåŠ¿
-}FOC_CC_DecouplingMode;    //ç£åœºå®šå‘ç”µæµæ§åˆ¶è§£è€¦æ¨¡å¼
+    FOC_CC_DECOUPLING_DISABLED   = 0,  //²»½âñî
+    FOC_CC_DECOUPLING_CROSS      = 1,  //Ö»½»²æñîºÏ£¨dqÖáµçÁ÷½âñî£©
+    FOC_CC_DECOUPLING_BEMF       = 2,  //Ö»·´µçÊÆ
+    FOC_CC_DECOUPLING_CROSS_BEMF = 3   //½»²æ+·´µçÊÆ
+}FOC_CC_DecouplingMode;    //´Å³¡¶¨ÏòµçÁ÷¿ØÖÆ½âñîÄ£Ê½
 
-//ç”µæœºè¿è¡Œæ ‡å¿—ä½ç»“æ„ä½“
-typedef struct  //æ‰€æœ‰æ ‡å¿—ä½é»˜è®¤ä¸º0
+//µç»úÔËĞĞ±êÖ¾Î»½á¹¹Ìå
+typedef struct  //ËùÓĞ±êÖ¾Î»Ä¬ÈÏÎª0
 {
-	uint8_t Error_Flag;            //ä¸º1è¡¨ç¤ºè¿‡å‹ï¼Œ2ä¸ºæ¬ å‹ï¼Œ3è¡¨ç¤ºè¿‡æµ
-	uint8_t Adc_OffectOver_Flag;   //1ä»£è¡¨ADCæ ¡å‡†å®Œæˆ
-	uint8_t Zero_Flag;             //1ä»£è¡¨é›¶åæ ¡å‡†å®Œæˆï¼Œé»˜è®¤ä¸º1ï¼Œéœ€è¦æ ¡å‡†æ—¶å†é›¶åæ ¡å‡†
-	uint8_t Econder_Mode;          //ç¼–ç å™¨æ¨¡å¼ï¼Œ1ä¸ºå¼€ç¯è‡ªå¢è§’åº¦ï¼Œ2ä¸ºé—­ç¯çœŸå®è§’åº¦
-	uint8_t Mode_Select;           //ç”µæœºè¿è¡Œæ¨¡å¼é€‰æ‹©ï¼Œ1ä¸ºSPWMè¿è¡Œï¼Œ2ä¸ºSVPWMè¿è¡Œï¼Œ3ä¸ºç”µæµç¯è¿è¡Œï¼Œ4ä¸ºé€Ÿåº¦-ç”µæµç¯è¿è¡Œï¼Œ5ä¸ºä½ç½®-é€Ÿåº¦-ç”µæµç¯è¿è¡Œ
-	VLimitMode v_limit_mode;       //dqè½´ç”µå‹é™å¹…æ¨¡å¼é€‰æ‹©ï¼š1ä¸ºqè½´ä¼˜å…ˆï¼Œ2ä¸ºdè½´ä¼˜å…ˆï¼Œ3ä¸ºç­‰æ¯”ä¾‹é™å¹…
-	FOC_CC_DecouplingMode dec_mode;//ç”µæµç¯å‰é¦ˆæ§åˆ¶æ¨¡å¼é€‰æ‹©ï¼Œ0ä¸è¡¥å¿ï¼Œ1dqè½´è§£è€¦ï¼Œ2åç”µåŠ¨åŠ¿è¡¥å¿ï¼Œ3éƒ½è¡¥å¿
+	uint8_t Error_Flag;            //Îª1±íÊ¾¹ıÑ¹£¬2ÎªÇ·Ñ¹£¬3±íÊ¾¹ıÁ÷
+	uint8_t Adc_OffectOver_Flag;   //1´ú±íADCĞ£×¼Íê³É
+	uint8_t Zero_Flag;             //1´ú±íÁãÆ«Ğ£×¼Íê³É£¬Ä¬ÈÏÎª1£¬ĞèÒªĞ£×¼Ê±ÔÙÁãÆ«Ğ£×¼
+	uint8_t Econder_Mode;          //±àÂëÆ÷Ä£Ê½£¬1Îª¿ª»·×ÔÔö½Ç¶È£¬2Îª±Õ»·ÕæÊµ½Ç¶È
+	uint8_t Mode_Select;           //µç»úÔËĞĞÄ£Ê½Ñ¡Ôñ£¬1ÎªSPWMÔËĞĞ£¬2ÎªSVPWMÔËĞĞ£¬3ÎªµçÁ÷»·ÔËĞĞ£¬4ÎªËÙ¶È-µçÁ÷»·ÔËĞĞ£¬5ÎªÎ»ÖÃ-ËÙ¶È-µçÁ÷»·ÔËĞĞ
+	VLimitMode v_limit_mode;       //dqÖáµçÑ¹ÏŞ·ùÄ£Ê½Ñ¡Ôñ£º1ÎªqÖáÓÅÏÈ£¬2ÎªdÖáÓÅÏÈ£¬3ÎªµÈ±ÈÀıÏŞ·ù
+	FOC_CC_DecouplingMode dec_mode;//µçÁ÷»·Ç°À¡¿ØÖÆÄ£Ê½Ñ¡Ôñ£¬0²»²¹³¥£¬1dqÖá½âñî£¬2·´µç¶¯ÊÆ²¹³¥£¬3¶¼²¹³¥
 	uint8_t pid_param_flag;    
 }Motor_Flag;
 
 
 typedef struct
 {
-	float Ua,Ub,Uc;        //ABCä¸‰ç›¸ç”µå‹å€¼
+	float Ua,Ub,Uc;        //ABCÈıÏàµçÑ¹Öµ
 	float Ualpha,Ubeta;     
-	float supply_Udc;        //æ¯çº¿ç”µå‹
-	uint16_t Tpwm;         //å®šæ—¶å™¨è®¡æ•°æœ€å¤§å€¼
+	float supply_Udc;        //Ä¸ÏßµçÑ¹
+	uint16_t Tpwm;         //¶¨Ê±Æ÷¼ÆÊı×î´óÖµ
 }SPWM_Param;
 
 typedef struct
 {
-	float Udc;             //æ¯çº¿ç”µå‹å¤§å°
-	uint16_t Ts;         //å®šæ—¶å™¨è®¡æ•°æœ€å¤§å€¼
+	float Udc;             //Ä¸ÏßµçÑ¹´óĞ¡
+	uint16_t Ts;         //¶¨Ê±Æ÷¼ÆÊı×î´óÖµ
 }SVPWM_Param;
 
 typedef struct
 {
-	float Ia_Sample,Ib_Sample,Ic_Sample;    //ADCé‡‡æ ·åŸå§‹å€¼ï¼Œ12ä½ADCï¼š0-4095
-	float Ia_offect,Ib_offect,Ic_offect;    //ADCä¸‰ç›¸ç”µæµåç½®å€¼ï¼Œæ­£å¸¸æ˜¯3.3V/2 = 1.65V
+	float Ia_Sample,Ib_Sample,Ic_Sample;    //ADC²ÉÑùÔ­Ê¼Öµ£¬12Î»ADC£º0-4095
+	float Ia_offect,Ib_offect,Ic_offect;    //ADCÈıÏàµçÁ÷Æ«ÖÃÖµ£¬Õı³£ÊÇ3.3V/2 = 1.65V
 	float Ia,Ib,Ic,Udc;
-	uint16_t Iadc_offect_counts;            //ä¸‰ç›¸ç”µæµåç½®å€¼è®¡æ¬¡
-	float IGain;                            //è¿ç®—æ”¾å¤§å™¨å’Œé‡‡æ ·ç”µé˜»ç»„åˆçš„ç”µæµå¢ç›Šå¤§å°ï¼šIGain = Rs(é‡‡æ ·ç”µé˜»å¤§å°)*è¿æ”¾å€æ•°
+	uint16_t Iadc_offect_counts;            //ÈıÏàµçÁ÷Æ«ÖÃÖµ¼Æ´Î
+	float IGain;                            //ÔËËã·Å´óÆ÷ºÍ²ÉÑùµç×è×éºÏµÄµçÁ÷ÔöÒæ´óĞ¡£ºIGain = Rs(²ÉÑùµç×è´óĞ¡)*ÔË·Å±¶Êı
 }ADCTask_Param;
 
 typedef struct
 {
-	uint16_t Encoder_Max;           //ç¼–ç å™¨æœ€å¤§å€¼ï¼Œ14ä½ç£ç¼–æœ€å¤§å€¼16384
-	uint16_t Encoder_raw;           //ç¼–ç å™¨åŸå§‹æ•°æ®ï¼Œ0-16383
-	uint8_t motordir;               //ç¼–ç å™¨æ—‹è½¬æ–¹å‘
-	float Shaft_Angle;              //æœºæ¢°è§’åº¦
-	float Elect_Angle;              //ç”µè§’åº¦ï¼Œç”µè§’åº¦=æœºæ¢°è§’åº¦*æå¯¹æ•°
-	float Zero_Angle_Sum;           //é›¶åæ ¡å‡†è§’åº¦å’Œ
-	float Zero_Angle;               //é›¶åè§’åº¦ï¼Œæœºæ¢°0ä¸ç”µè§’åº¦0çš„å·®å€¼
-	uint16_t Zero_counts;           //é›¶åæ ¡å‡†æ¬¡æ•°
-	uint16_t Zero_n;                //å®é™…é›¶åè®¡æ¬¡æ¬¡æ•°
-	float Return_Angle;             //çœŸå®ç¨‹åºä½¿ç”¨çš„è§’åº¦å€¼
-	float Return_Rads;              //çœŸå®ä½¿ç”¨çš„å¼§åº¦å€¼
-	float vf_v;                     //vfå¼ºæ‹–çš„ç³»æ•°v
-	float vf_k;                     //vfç³»æ•°
-	float virtual_step;             //æ¯æ¬¡è‡ªå¢çš„è™šæ‹Ÿè§’åº¦æ­¥é•¿
-	float sin_dsp,cos_dsp;          //ç”¨Return_Angle
+	uint16_t Encoder_Max;           //±àÂëÆ÷×î´óÖµ£¬14Î»´Å±à×î´óÖµ16384
+	uint16_t Encoder_raw;           //±àÂëÆ÷Ô­Ê¼Êı¾İ£¬0-16383
+	uint8_t motordir;               //±àÂëÆ÷Ğı×ª·½Ïò
+	float Shaft_Angle;              //»úĞµ½Ç¶È
+	float Elect_Angle;              //µç½Ç¶È£¬µç½Ç¶È=»úĞµ½Ç¶È*¼«¶ÔÊı
+	float Zero_Angle_Sum;           //ÁãÆ«Ğ£×¼½Ç¶ÈºÍ
+	float Zero_Angle;               //ÁãÆ«½Ç¶È£¬»úĞµ0Óëµç½Ç¶È0µÄ²îÖµ
+	uint16_t Zero_counts;           //ÁãÆ«Ğ£×¼´ÎÊı
+	uint16_t Zero_n;                //Êµ¼ÊÁãÆ«¼Æ´Î´ÎÊı
+	float Return_Angle;             //ÕæÊµ³ÌĞòÊ¹ÓÃµÄ½Ç¶ÈÖµ
+	float Return_Rads;              //ÕæÊµÊ¹ÓÃµÄ»¡¶ÈÖµ
+	float vf_v;                     //vfÇ¿ÍÏµÄÏµÊıv
+	float vf_k;                     //vfÏµÊı
+	float virtual_step;             //Ã¿´Î×ÔÔöµÄĞéÄâ½Ç¶È²½³¤
+	float sin_dsp,cos_dsp;          //ÓÃReturn_Angle
 }EncoderTask_Param;
 
 typedef struct
@@ -117,57 +120,107 @@ typedef struct
 	float Uout_Max;
 }PID_Param;
 
-//ç”µé˜»å‚æ•°è¾¨æçŠ¶æ€
+//µç×è²ÎÊı±æÎö×´Ì¬
 typedef enum
 {
-	RsID_IDLE = 0,           //ç©ºé—²æ¨¡å¼ï¼Œè¿˜æœªå®Œæˆåˆå§‹åŒ–,èµ‹å€¼ä¸º0ï¼Œé»˜è®¤ä¸ºRsID_IDLEï¼Œä¸èµ‹å€¼å°±ä¼šå¯¼è‡´ä¸º0å‡ºé”™è¯¯
-	RsID_Pos_Set,            //æ­£å‘ç”µå‹è®¾ç½®ï¼Œè®¾ç½®å®Œä¹‹åè¦ç­‰ç¨³å®šåœ¨è¿›ä¸‹ä¸€ä¸ªçŠ¶æ€é‡‡é›†
-	RsID_Pos_Average,        //æ­£å‘ç”µå‹è®¾ç½®åç”µæµå¹³å‡å€¼é‡‡é›†
-	RsID_Neg_Set,            //åå‘ç”µå‹è®¾ç½®ï¼Œè®¾ç½®å®Œä¹‹åè¦ç­‰ç¨³å®šåœ¨è¿›ä¸‹ä¸€ä¸ªçŠ¶æ€é‡‡é›†
-	RsID_Neg_Average,        //åå‘ç”µå‹è®¾ç½®åç”µæµå¹³å‡å€¼é‡‡é›†
-	RsID_Done                //å‚æ•°è¾¨æå®Œæˆ
+	RsID_IDLE = 0,           //¿ÕÏĞÄ£Ê½£¬»¹Î´Íê³É³õÊ¼»¯,¸³ÖµÎª0£¬Ä¬ÈÏÎªRsID_IDLE£¬²»¸³Öµ¾Í»áµ¼ÖÂÎª0³ö´íÎó
+	RsID_Pos_Set,            //ÕıÏòµçÑ¹ÉèÖÃ£¬ÉèÖÃÍêÖ®ºóÒªµÈÎÈ¶¨ÔÚ½øÏÂÒ»¸ö×´Ì¬²É¼¯
+	RsID_Pos_Average,        //ÕıÏòµçÑ¹ÉèÖÃºóµçÁ÷Æ½¾ùÖµ²É¼¯
+	RsID_Neg_Set,            //·´ÏòµçÑ¹ÉèÖÃ£¬ÉèÖÃÍêÖ®ºóÒªµÈÎÈ¶¨ÔÚ½øÏÂÒ»¸ö×´Ì¬²É¼¯
+	RsID_Neg_Average,        //·´ÏòµçÑ¹ÉèÖÃºóµçÁ÷Æ½¾ùÖµ²É¼¯
+	RsID_Done                //²ÎÊı±æÎöÍê³É
 }RsID_State;
 
-//ç”µé˜»å‚æ•°è¾¨æç»“æ„ä½“å‚æ•°
+//µç×è²ÎÊı±æÎö½á¹¹Ìå²ÎÊı
 typedef struct
 {
-	//Rsç”µé˜»è¾¨æ
-	RsID_State Rsid_state;    //ç”µé˜»è¾¨æçŠ¶æ€æšä¸¾
+	//Rsµç×è±æÎö
+	RsID_State Rsid_state;    //µç×è±æÎö×´Ì¬Ã¶¾Ù
 	
-	float Ud_Set;             //å‚æ•°è¾¨æUdè®¾ç½®å€¼ï¼Œä¸€èˆ¬å–ï¼ˆ1.0-1.5ï¼‰
-	uint16_t cnt_sum;         //æ‰§è¡ŒçŠ¶æ€çš„ç´¯è®¡æ¬¡æ•°
-	uint16_t wait_cnt;        //ç­‰å¾…ç¨³å®šæ‰€èŠ±çš„æ¬¡æ•°ï¼Œ20kçš„æ‰§è¡Œé¢‘ç‡ï¼Œç­‰å¾…1200æ¬¡ï¼Œä¸º60ms
-	uint16_t collect_cnt;     //ç”µæµç¨³å®šåé‡‡é›†çš„æ¬¡æ•°ï¼Œ20kæ‰§è¡Œé¢‘ç‡ï¼Œé‡‡é›†2000æ¬¡ï¼Œä¸º100ms
-	uint8_t RsID_Start;       //ç”µé˜»è¾¨æåˆå§‹åŒ–å®Œæˆæ ‡å¿—ä½ï¼Œç½®1è¡¨ç¤ºåˆå§‹åŒ–å®Œæˆï¼Œä¸‹ä¸€æ­¥å¼€å§‹è¾¨æ
-	float lock_angle;         //ç”µæœºé”å®šè§’åº¦ï¼Œå‚æ•°è¾¨ææ—¶ä¿æŒåœ¨è¯¥è§’åº¦ä¸å˜
+	float Ud_Set;             //²ÎÊı±æÎöUdÉèÖÃÖµ£¬Ò»°ãÈ¡£¨1.0-1.5£©
+	uint16_t cnt_sum;         //Ö´ĞĞ×´Ì¬µÄÀÛ¼Æ´ÎÊı
+	uint16_t wait_cnt;        //µÈ´ıÎÈ¶¨Ëù»¨µÄ´ÎÊı£¬20kµÄÖ´ĞĞÆµÂÊ£¬µÈ´ı1200´Î£¬Îª60ms
+	uint16_t collect_cnt;     //µçÁ÷ÎÈ¶¨ºó²É¼¯µÄ´ÎÊı£¬20kÖ´ĞĞÆµÂÊ£¬²É¼¯2000´Î£¬Îª100ms
+	uint8_t RsID_Start;       //µç×è±æÎö³õÊ¼»¯Íê³É±êÖ¾Î»£¬ÖÃ1±íÊ¾³õÊ¼»¯Íê³É£¬ÏÂÒ»²½¿ªÊ¼±æÎö
+	float lock_angle;         //µç»úËø¶¨½Ç¶È£¬²ÎÊı±æÎöÊ±±£³ÖÔÚ¸Ã½Ç¶È²»±ä
 
-	float Id_collect_sum;     //ç”µæµé‡‡é›†ç´¯è®¡å€¼
-	float Id_pos_avg;         //æ­£å‘ç”µæµå¹³å‡å€¼
-	float Id_neg_avg;         //åå‘ç”µæµå¹³å‡å€¼
+	float Id_collect_sum;     //µçÁ÷²É¼¯ÀÛ¼ÆÖµ
+	float Id_pos_avg;         //ÕıÏòµçÁ÷Æ½¾ùÖµ
+	float Id_neg_avg;         //·´ÏòµçÁ÷Æ½¾ùÖµ
 	
-	float Rs_result;          //ç›¸ç”µé˜»æµ‹é‡ç»“æœ
-	uint8_t Rs_done;          //ç›¸ç”µé˜»è¾¨æç»“æŸï¼Œ1è¡¨ç¤ºç»“æŸ
+	float Rs_result;          //Ïàµç×è²âÁ¿½á¹û
+	uint8_t Rs_done;          //Ïàµç×è±æÎö½áÊø£¬1±íÊ¾½áÊø
 	
-	//Ldã€Lqç”µæ„Ÿè¾¨æ
-	float Udq_inject;         //ç›¸ç”µæ„ŸUdqæ³¨å…¥ç”µå‹å¤§å°
-	float frequency_inject;   //æ³¨å…¥æ–¹æ³¢é¢‘ç‡å€¼
-	uint8_t Ldq_select;       //dqè½´ç”µæ„Ÿæµ‹é‡ï¼Œé»˜è®¤ä¸º0è¾¨æqè½´ç”µæ„Ÿï¼Œ1è¾¨ædè½´ç”µæ„Ÿ
+	//Ld¡¢Lqµç¸Ğ±æÎö
+	float Udq_inject;         //Ïàµç¸ĞUdq×¢ÈëµçÑ¹´óĞ¡
+	float frequency_inject;   //×¢Èë·½²¨ÆµÂÊÖµ
+	uint8_t Ldq_select;       //dqÖáµç¸Ğ²âÁ¿£¬Ä¬ÈÏÎª0±æÎöqÖáµç¸Ğ£¬1±æÎödÖáµç¸Ğ
 	
-	uint16_t half_cnts;       //åŠä¸ªå‘¨æœŸéœ€è¦è®¡æ¬¡å€¼
-	uint16_t Ldq_half_cnt;    //åŠä¸ªå‘¨æœŸè®¡æ¬¡å€¼ï¼Œå¯¹æ¯”çœ‹æ˜¯å¦è¯¥æ‰§è¡Œä¸‹åŠä¸ªå‘¨æœŸ
-	uint16_t half_index;      //åŠä¸ªå‘¨æœŸè®¡æ¬¡æ•°ï¼Œçœ‹å®Œæˆäº†å¤šå°‘åŠä¸ªå‘¨æœŸ
-	uint16_t calculate_cnt;   //è®¡ç®—å‘¨æœŸæ€»æ‰§è¡Œæ¬¡æ•°
-	uint16_t Ldq_cnt;         //å®é™…dqè½´åŠå‘¨æœŸè®¡ç®—çš„å®Œæˆæ¬¡æ•°
-	uint16_t LdqID_Start;     //ç”µæ„Ÿè¾¨æåˆå§‹åŒ–å®Œæˆæ ‡å¿—ä½
+	uint16_t half_cnts;       //°ë¸öÖÜÆÚĞèÒª¼Æ´ÎÖµ
+	uint16_t Ldq_half_cnt;    //°ë¸öÖÜÆÚ¼Æ´ÎÖµ£¬¶Ô±È¿´ÊÇ·ñ¸ÃÖ´ĞĞÏÂ°ë¸öÖÜÆÚ
+	uint16_t half_index;      //°ë¸öÖÜÆÚ¼Æ´ÎÊı£¬¿´Íê³ÉÁË¶àÉÙ°ë¸öÖÜÆÚ
+	uint16_t calculate_cnt;   //¼ÆËãÖÜÆÚ×ÜÖ´ĞĞ´ÎÊı
+	uint16_t Ldq_cnt;         //Êµ¼ÊdqÖá°ëÖÜÆÚ¼ÆËãµÄÍê³É´ÎÊı
+	uint16_t LdqID_Start;     //µç¸Ğ±æÎö³õÊ¼»¯Íê³É±êÖ¾Î»
 	
-	float i_max,i_min;        //æ‹¿åŠä¸ªå‘¨æœŸå†…ç”µæµå˜åŒ–ç‡ç´¯è®¡æ±‚å’Œæ¥æ±‚è§£ç”µæ„Ÿ
-	float iavgs_half_sum;     //æ¯åŠä¸ªå‘¨æœŸç”µæµå¹³å‡å€¼
-	float Ldq_sum;            //æœ€ç»ˆæ‰€æœ‰åŠå‘¨æœŸè®¡ç®—ç´¯è®¡çš„ç”µæ„Ÿå’Œ
+	float i_max,i_min;        //ÄÃ°ë¸öÖÜÆÚÄÚµçÁ÷±ä»¯ÂÊÀÛ¼ÆÇóºÍÀ´Çó½âµç¸Ğ
+	float iavgs_half_sum;     //Ã¿°ë¸öÖÜÆÚµçÁ÷Æ½¾ùÖµ
+	float Ldq_sum;            //×îÖÕËùÓĞ°ëÖÜÆÚ¼ÆËãÀÛ¼ÆµÄµç¸ĞºÍ
 	
-	float Lq_result;          //qè½´ç”µæ„Ÿæ±‚è§£å€¼
-	float Ld_result;          //dè½´ç”µæ„Ÿæ±‚è§£å€¼
-	uint16_t Ldq_done;        //ç”µæ„Ÿè¾¨æç»“æŸæ ‡å¿—ä½
+	float Lq_result;          //qÖáµç¸ĞÇó½âÖµ
+	float Ld_result;          //dÖáµç¸ĞÇó½âÖµ
+	uint16_t Ldq_done;        //µç¸Ğ±æÎö½áÊø±êÖ¾Î»
 	
 }MotorID_Param;
+
+
+//É¨Æµ·¨²âµçÁ÷»·´ø¿í½á¹¹Ìå
+//É¨Æµ·¨Êı¾İ²É¼¯½á¹¹ÌåÊı×é²ÎÊı
+typedef struct
+{
+	uint16_t sample_index;        // µÚ¼¸¸ö20kÖĞ¶Ïµã
+	float frequence;              // µ±Ç°²âÊÔÆµÂÊ
+	float iq_ref;                 // IqÄ¿±ê
+	float iq_now;                 // IqÊµ¼Ê
+}ScanFre_Sample;
+
+//É¨Æµ·¨×´Ì¬»ú
+typedef enum
+{
+	SCANFRE_IDLE = 0,           //É¨Æµ·¨¿ÕÏĞ×´Ì¬
+	SCANFRE_IINIT,              //É¨Æµ·¨³õÊ¼»¯×´Ì¬
+	SCANFRE_WAIT,               //É¨Æµ·¨µÈ´ıÎÈ¶¨×´Ì¬
+	SCANFRE_SAMPLE,             //É¨Æµ·¨²É¼¯×´Ì¬
+	SCANFRE_DONE                //É¨Æµ·¨Íê³É×´Ì¬
+}ScanFre_State;
+
+//3ã€æ‰«é¢‘ç»“æ„ä½“
+typedef struct
+{
+	ScanFre_State scanfre_state;   
+	
+	ScanFre_Sample* scanfre_buff;  //É¨Æµ·¨²É¼¯µÄ½á¹¹ÌåÊı×é
+	
+	uint8_t start_flag;
+	uint8_t done_flag;
+	
+	float frequence_hz;
+	float iq_bias;
+	float iq_amp;
+	float iq_ref;
+	float lock_angle;
+	
+	float phase;
+	float phase_step;
+	
+	uint16_t wait_cycle;
+	uint16_t sample_cycle;
+	uint16_t wait_cnt;
+	uint16_t sample_cnt;
+	uint16_t cnt_now;
+	
+	uint16_t buf_len;
+	uint16_t buf_now;
+}ScanFre_Param;
 
 #endif

@@ -1,11 +1,18 @@
 #include "MotorID.h"
 #include "FOC.h"
 
+
 extern ADCTask_Param adctask_param;          //ADC采样任务参数
 extern EncoderTask_Param encodertask_param;  //编码器任务结构体
 extern SVPWM_Param svpwm_param;              //SPWM生成的过程参数
 extern MotorID_Param rsid_param;                //电阻辨析结构体参数
 extern PID_Param pid_param;                  //PID参数结构体
+
+extern ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
+extern ScanFre_Param scanfre_param;             //扫频法测带宽结构体
+
+
+#define Current_ISR_FRE   20000.0f     //电流环执行频率
 
 //电阻辨析初始化操作
 static void RsID_Init(MotorID_Param* rsparam)
@@ -121,7 +128,7 @@ static void LdqID_Init(MotorID_Param* ldqparam)
 //	ldqparam->frequency_inject = 400;    //注入方波频率，要小于电流环执行频率
 	ldqparam->lock_angle = encodertask_param.Return_Angle;   //确保辨析过程中保持该角度不变
 	
-	ldqparam->half_cnts = (uint16_t)(20000.0f*0.5f/ldqparam->frequency_inject);  //求得半个周期下对应注入频率的计次值
+	ldqparam->half_cnts = (uint16_t)(Current_ISR_FRE*0.5f/ldqparam->frequency_inject);  //求得半个周期下对应注入频率的计次值
 	ldqparam->calculate_cnt = 2*30;       //执行完整的30次方波周期计算
 	
 	ldqparam->Ldq_half_cnt = 0;        //计次比较先清0
@@ -225,10 +232,248 @@ void LdqID_Task(MotorID_Param* ldqparam)
 	}
 }
 
+/*
+	扫频法电流带宽测量初始化函数
+*/
+void ScanFrequence_Init(ScanFre_Param* sf_p)
+{
+	sf_p->iq_bias = 0.0f;                                 //扫频电流直流偏置值
+	sf_p->iq_amp = 0.3f;                                  //扫频电流幅值
+	sf_p->iq_ref = 0.0f;
+	sf_p->lock_angle = 0;                                 //设定固定角度设定
+	
+	sf_p->frequence_hz = 100;
+	sf_p->phase = 0.0f;                                   //相位为0
+	sf_p->phase_step = 0.0f;                              //相位步进为0
+	
+	sf_p->start_flag = 0;                                 //开始标志位清0
+	sf_p->done_flag = 0;                                  //结束标志位清0
+	
+	sf_p->wait_cycle = 5;                                 //等待n个完整波形稳定
+	sf_p->wait_cnt = 0;                                   //等待计次比较
+	sf_p->sample_cycle = 5;                               //采集n个波形数据
+	sf_p->sample_cnt = 0;                                 //采集计次比较
+
+	sf_p->buf_len = 1200;                                 //16kb大小存储区，一个数组下标是4个数据 , 100Hz采集5周期是1000个点,注意100Hz以下可能会超限数组
+	sf_p->buf_now = 0;                                    //当前采样数组下标
+	
+	sf_p->scanfre_state = SCANFRE_IDLE;
+}
+
+/*
+	根据执行周期与频率计算进行的计次数
+	参数：
+		float frequence  扫频法当前电流注入频率
+		float cycle      扫频法等待或采样的完整波形数
+*/
+static uint16_t ScanFrequence_CntCal(float frequence,float cycle)
+{
+	float cnt = (Current_ISR_FRE / frequence) * cycle;
+	return cnt;
+}
+
+
+
+
+void ScanFrequence_Start(ScanFre_Param* sf_p,float iq_bias,float iq_amp,float fre_hz,float lock_angle)
+{
+	sf_p->done_flag = 0;
+	sf_p->start_flag = 0;
+	
+	sf_p->iq_bias = iq_bias;
+	sf_p->iq_amp = iq_amp;
+	sf_p->frequence_hz = fre_hz;
+	sf_p->lock_angle = lock_angle;
+	
+	//自主选择周期数
+	uint16_t point_cycle = Current_ISR_FRE / sf_p->frequence_hz;
+	point_cycle = (uint16_t)ceil(300.0f/point_cycle);    //向上取整采样/等待周期
+	sf_p->sample_cycle = point_cycle;
+	
+	sf_p->scanfre_state = SCANFRE_IINIT;
+}
+
+
+
+
+
+
+
 
 /*
 	扫频法测试电流环带宽：
 	
 */
+void ScanFrequence_Task(ScanFre_Param* sf_p)
+{
+	switch(sf_p->scanfre_state)
+	{
+		case SCANFRE_IDLE:
+		{
+				pid_param.Iq_aim = 0.0f;
+				pid_param.Id_aim = 0.0f;
+			break;
+		}
+		case SCANFRE_IINIT:
+		{
+			sf_p->start_flag = 1;
+			sf_p->wait_cnt = ScanFrequence_CntCal(sf_p->frequence_hz,sf_p->wait_cycle);
+			sf_p->sample_cnt = ScanFrequence_CntCal(sf_p->frequence_hz,sf_p->sample_cycle);
+			
+			sf_p->phase = 0.0f;
+			sf_p->phase_step = PI2_F * sf_p->frequence_hz / Current_ISR_FRE;
+			
+			sf_p->cnt_now = 0;
+			sf_p->buf_now = 0;
+			
+			sf_p->scanfre_state = SCANFRE_WAIT;
+			break;
+		}
+		case SCANFRE_WAIT:
+		{
+			sf_p->phase += sf_p->phase_step;
+			if(sf_p->phase > PI2_F) sf_p->phase -= PI2_F;
+			sf_p->iq_ref =  sf_p->iq_bias + sf_p->iq_amp*arm_sin_f32(sf_p->phase);
+			
+			pid_param.Iq_aim = sf_p->iq_ref;
+			pid_param.Id_aim = 0.0f;
+			
+			sf_p->cnt_now++;
+			if(sf_p->cnt_now>=sf_p->wait_cnt)
+			{
+				sf_p->cnt_now = 0;
+				sf_p->scanfre_state = SCANFRE_SAMPLE;
+			}
+			break;
+		}
+		case SCANFRE_SAMPLE:
+		{
+			sf_p->phase += sf_p->phase_step;
+			if(sf_p->phase > PI2_F) sf_p->phase -= PI2_F;
+			sf_p->iq_ref =  sf_p->iq_bias + sf_p->iq_amp*arm_sin_f32(sf_p->phase);
+			
+			pid_param.Iq_aim = sf_p->iq_ref;
+			pid_param.Id_aim = 0.0f;
+			
+			if(sf_p->buf_now<sf_p->buf_len)
+			{
+				sf_p->scanfre_buff[sf_p->buf_now].frequence = sf_p->frequence_hz;
+				sf_p->scanfre_buff[sf_p->buf_now].iq_now = pid_param.Iq_now;
+				sf_p->scanfre_buff[sf_p->buf_now].iq_ref = sf_p->iq_ref;
+				sf_p->scanfre_buff[sf_p->buf_now].sample_index = sf_p->cnt_now;
+				sf_p->buf_now++;
+			}
+			
+			sf_p->cnt_now++;
+			if(sf_p->cnt_now>=sf_p->sample_cnt || sf_p->buf_now>=sf_p->buf_len)
+			{
+				sf_p->start_flag = 0;
+				sf_p->done_flag = 1;
+				
+				sf_p->scanfre_state = SCANFRE_DONE;
+			}
+			
+			break;
+		}
+		case SCANFRE_DONE:
+		{
+			pid_param.Iq_aim = 0.0f;
+			pid_param.Id_aim = 0.0f;
+			break;
+		}
+		
+	}
+}
+
+
+
+/*
+	扫频法的数组打印
+*/
+void ScanFrequence_PrintBuff(void)
+{
+    uint16_t i;
+
+//    printf("sample_index,frequence,iq_ref,iq_now\r\n");
+    for(i = 0; i < scanfre_param.buf_now; i++)
+    {
+        printf("%u,%.3f,%.6f,%.6f\r\n",
+               scanfre_param.scanfre_buff[i].sample_index,
+               scanfre_param.scanfre_buff[i].frequence,
+               scanfre_param.scanfre_buff[i].iq_ref,
+               scanfre_param.scanfre_buff[i].iq_now);
+    }
+}
+
+/*
+	扫频法对数坐标频率值：生成波特图（对数坐标）扫频所需的频率数组
+	此函数生成一个频率序列，在对数坐标下均匀分布，这是绘制波特图时进行扫频测试的标准方法
+	因此序列要满足：log10(freq[i]) 构成一个等差数列
+	参数：
+		start_freq_Hz 扫频起始频率 (Hz), 必须 > 0
+		end_freq_Hz 扫频终止频率 (Hz), 必须 > start_freq_Hz
+		num_points 需要生成的总频率点数，必须 >= 2
+		freq_array_Hz 用于存储生成的频率数组，至少 num_points 个浮点数的空间
+	成功返回0，失败返回-1（参数错误）
+*/
+int generate_bode_frequencies(float start_freq_Hz,float end_freq_Hz,int num_points,float *freq_array_Hz) 
+{
+    // 参数有效性检查
+    if (start_freq_Hz <= 0.0f || end_freq_Hz <= start_freq_Hz || num_points < 2 || !freq_array_Hz) 
+		{
+        fprintf(stderr, "错误：无效的输入参数。\n");
+        return -1;
+    }
+
+    // 计算起始和终止频率的对数值
+    double log_start = log10(start_freq_Hz);
+    double log_end = log10(end_freq_Hz);
+
+    // 计算对数坐标下的步长
+    double log_step = (log_end - log_start) / (num_points - 1);
+
+    // 生成频率点
+    for (int i = 0; i < num_points; ++i) 
+		{
+        double current_log_freq = log_start + i * log_step;
+        freq_array_Hz[i] = (float)pow(10.0, current_log_freq);
+    }
+
+    // 强制保证起点和终点的精确性，避免浮点误差
+    freq_array_Hz[0] = start_freq_Hz;
+    freq_array_Hz[num_points - 1] = end_freq_Hz;
+
+    return 0;
+}
+
+
+
+/**
+ * @brief 打印生成的频率数组，并验证其对数间隔特性
+ * 
+ * @param freq_array_Hz 频率数组
+ * @param num_points 数组长度
+ */
+void print_and_verify_frequencies(const float *freq_array_Hz, int num_points)
+{
+    if (num_points < 2) return;
+
+    printf("序号\t频率 (Hz)\t\t相邻频率比 (f[i]/f[i-1])\n");
+    printf("------------------------------------------------------------------------\n");
+    for (int i = 0; i < num_points; ++i) 
+		{
+        if (i == 0) 
+				{
+            printf("%4d\t%12.4f\t\t%s\n", i + 1, freq_array_Hz[i], "N/A (起点)");
+        } 
+				else 
+				{
+            float ratio = freq_array_Hz[i] / freq_array_Hz[i - 1];
+            printf("%4d\t%12.4f\t\t%12.6f\n", i + 1, freq_array_Hz[i], ratio);
+        }
+    }
+    printf("\n验证：相邻频率比应为常数。\n");
+}
+
 
 

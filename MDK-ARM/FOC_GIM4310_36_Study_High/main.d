@@ -36,10 +36,13 @@ foc_gim4310_36_study_high\main.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_
 foc_gim4310_36_study_high\main.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_spi_ex.h
 foc_gim4310_36_study_high\main.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h
 foc_gim4310_36_study_high\main.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h
+foc_gim4310_36_study_high\main.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h
+foc_gim4310_36_study_high\main.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h
 foc_gim4310_36_study_high\main.o: ../Core/Inc/adc.h
 foc_gim4310_36_study_high\main.o: ../Core/Inc/cordic.h
 foc_gim4310_36_study_high\main.o: ../Core/Inc/spi.h
 foc_gim4310_36_study_high\main.o: ../Core/Inc/tim.h
+foc_gim4310_36_study_high\main.o: ../Core/Inc/usart.h
 foc_gim4310_36_study_high\main.o: ../Core/Inc/gpio.h
 foc_gim4310_36_study_high\main.o: ./Hardware/Start_Init/Start_Init.h
 foc_gim4310_36_study_high\main.o: ./Software/type.h
@@ -48,3 +51,5 @@ foc_gim4310_36_study_high\main.o: ../Middlewares/ST/ARM/DSP/Inc/arm_math.h
 foc_gim4310_36_study_high\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 foc_gim4310_36_study_high\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\float.h
 foc_gim4310_36_study_high\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\limits.h
+foc_gim4310_36_study_high\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+foc_gim4310_36_study_high\main.o: ./Software/MotorID/MotorID.h

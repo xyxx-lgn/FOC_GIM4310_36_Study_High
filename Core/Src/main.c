@@ -22,6 +22,7 @@
 #include "cordic.h"
 #include "spi.h"
 #include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -29,6 +30,7 @@
 
 #include "Start_Init.h"
 #include "type.h"
+#include "MotorID.h"
 
 /* USER CODE END Includes */
 
@@ -60,10 +62,14 @@ SVPWM_Param svpwm_param;              //SPWM生成的过程参数
 PID_Param pid_param;                  //PID参数结构体
 
 MotorID_Param rsid_param;                //电阻辨析结构体参数
-
+ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
+ScanFre_Param scanfre_param;             //扫频法测带宽结构体
 
 
 uint16_t ADC1InjectDate[4];    //注入组采样数组
+
+float freq_array[130]; 
+uint16_t fre_cnt = 1;
 
 
 /* USER CODE END PV */
@@ -112,10 +118,22 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM1_Init();
   MX_SPI1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   Start_Init();    //外设初始化
-
+	
+	generate_bode_frequencies(100,4000,130,freq_array);
+	
+//	if(!generate_bode_frequencies(100,2000,70,freq_array))
+//	{
+//		print_and_verify_frequencies(freq_array, 70);
+//	}
+//	else
+//	{
+//		printf("频率生成失败\n");
+//	}
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -125,6 +143,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+		
+		if(scanfre_param.done_flag == 1)
+		{
+			ScanFrequence_PrintBuff();
+			if(fre_cnt<130)
+			{
+				scanfre_param.frequence_hz = freq_array[fre_cnt];
+				fre_cnt++;
+				scanfre_param.start_flag=0;
+				scanfre_param.scanfre_state = SCANFRE_IDLE;
+			}
+			scanfre_param.done_flag =0;
+		}
   }
   /* USER CODE END 3 */
 }

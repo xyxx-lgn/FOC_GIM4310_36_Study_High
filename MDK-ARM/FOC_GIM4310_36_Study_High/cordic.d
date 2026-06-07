@@ -37,3 +37,5 @@ foc_gim4310_36_study_high\cordic.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4x
 foc_gim4310_36_study_high\cordic.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_spi_ex.h
 foc_gim4310_36_study_high\cordic.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h
 foc_gim4310_36_study_high\cordic.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h
+foc_gim4310_36_study_high\cordic.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h
+foc_gim4310_36_study_high\cordic.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h

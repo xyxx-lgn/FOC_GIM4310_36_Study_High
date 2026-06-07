@@ -35,6 +35,8 @@ extern Motor_Flag motor_flag;                //电机标志位结构体
 extern SVPWM_Param svpwm_param;              //SPWM生成的过程参数
 extern PID_Param pid_param;                  //PID参数结构体
 extern MotorID_Param rsid_param;                //电阻辨析结构体参数
+extern ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
+extern ScanFre_Param scanfre_param;             //扫频法测带宽结构体
 
 
 extern uint16_t ADC1InjectDate[4];     //注入组采样数组
@@ -45,7 +47,7 @@ void Data_Init()
 	motor_param.supply_Udc = 24.0f;                   //供电电压
 	motor_param.pole = 14;                            //电机极对数
 	motor_param.motor_gear=36.0f;         	          //电机减速比
-	motor_param.motor_phaseL=0.000405f;                //电机相电感   0.000405f实测       0.00075f是电机厂家参数
+	motor_param.motor_phaseL=0.000144f;                //电机相电感   0.000405f实测       0.00075f是电机厂家参数
 	motor_param.motor_phaseR=0.897f;                   //电机相电阻    0.897f实测          1.89f是电机厂家参数
 	motor_param.motor_Ld = motor_param.motor_phaseL;  //电机d轴电感
 	motor_param.motor_Lq = motor_param.motor_phaseL;  //电机q轴电感
@@ -53,7 +55,7 @@ void Data_Init()
 	motor_param.Tpwm = 8400;                          //定时器计数最大值
 	motor_param.Rs = 0.01;                            //采样电阻值大小
 	motor_param.Gain = 50;                            //运算放大器增益
-	motor_param.I_Width = 300.0f;                     //电机电流环带宽大小
+	motor_param.I_Width = 900.0f;                     //电机电流环带宽大小
 	
 	//电机运行标志位结构体
 	motor_flag.Zero_Flag = 1;                          //默认零偏校准标志位为1，避免每次启动都校准
@@ -109,6 +111,14 @@ void Data_Init()
 	rsid_param.Ldq_half_cnt = 0;
 	rsid_param.half_index = 0;
 	rsid_param.LdqID_Start = 0;          //Ld 0.0004164f      Lq 0.0003968f   取Lq=Ld=0.000405f
+	
+	//扫频法测电流环带宽
+	ScanFrequence_Init(&scanfre_param);
+	scanfre_param.scanfre_buff = scanfre_buff;
+	scanfre_param.frequence_hz = 100;
+	scanfre_param.start_flag=0;
+	scanfre_param.done_flag=0;
+	scanfre_param.scanfre_state = SCANFRE_IDLE;
 }
 
 
@@ -307,6 +317,10 @@ void Mode_Task()
 	else if(motor_flag.Mode_Select == 8)  //扫频模式
 	{
 		motor_flag.Econder_Mode = 3;
+		encodertask_param.Return_Angle = 0.0f;
+		if(scanfre_param.start_flag==0 && scanfre_param.done_flag==0 && scanfre_param.scanfre_state == SCANFRE_IDLE)
+			ScanFrequence_Start(&scanfre_param,scanfre_param.iq_bias,scanfre_param.iq_amp,scanfre_param.frequence_hz,encodertask_param.Return_Angle);
+		ScanFrequence_Task(&scanfre_param);
 		PID_I_Control(&pid_param);
 		Set_Svpwm(pid_param.Uq,pid_param.Ud,encodertask_param.Return_Angle,&svpwm_param);
 	}

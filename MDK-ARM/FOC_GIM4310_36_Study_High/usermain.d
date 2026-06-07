@@ -38,11 +38,15 @@ foc_gim4310_36_study_high\usermain.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g
 foc_gim4310_36_study_high\usermain.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_spi_ex.h
 foc_gim4310_36_study_high\usermain.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h
 foc_gim4310_36_study_high\usermain.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h
+foc_gim4310_36_study_high\usermain.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h
+foc_gim4310_36_study_high\usermain.o: ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h
 foc_gim4310_36_study_high\usermain.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 foc_gim4310_36_study_high\usermain.o: ../Middlewares/ST/ARM/DSP/Inc/arm_math.h
 foc_gim4310_36_study_high\usermain.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 foc_gim4310_36_study_high\usermain.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\float.h
 foc_gim4310_36_study_high\usermain.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\limits.h
+foc_gim4310_36_study_high\usermain.o: ../Core/Inc/usart.h
+foc_gim4310_36_study_high\usermain.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 foc_gim4310_36_study_high\usermain.o: ./Hardware/MT6701/MT6701.h
 foc_gim4310_36_study_high\usermain.o: ./Software/FOC/FOC.h
 foc_gim4310_36_study_high\usermain.o: ./Software/PID/PID.h
