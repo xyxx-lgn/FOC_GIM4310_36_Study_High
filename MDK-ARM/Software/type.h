@@ -167,6 +167,12 @@ typedef struct
 	float iavgs_half_sum;     //每半个周期电流平均值
 	float Ldq_sum;            //最终所有半周期计算累计的电感和
 	
+	float i_start_half;        // 半周期起点电流
+	float i_end_half;          // 半周期终点电流
+	float i_sum_half;          // 半周期电流累加
+	uint16_t i_cnt_half;       // 半周期采样计数
+	float L_half_last;         // 最近一次半周期算出的L，方便调试观察
+	
 	float Lq_result;          //q轴电感求解值
 	float Ld_result;          //d轴电感求解值
 	uint16_t Ldq_done;        //电感辨析结束标志位

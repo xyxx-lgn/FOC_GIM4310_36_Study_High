@@ -14,6 +14,9 @@ extern ScanFre_Param scanfre_param;             //扫频法测带宽结构体
 
 #define Current_ISR_FRE   20000.0f     //电流环执行频率
 
+
+/********************************************电阻辨析任务**************************************************************/
+
 //电阻辨析初始化操作
 static void RsID_Init(MotorID_Param* rsparam)
 {
@@ -30,6 +33,7 @@ static void RsID_Init(MotorID_Param* rsparam)
 /*
 	电机电阻辨析任务：
 	原理如下；
+		U = R*i + L*di/dt
 		u_d = R_s*i_d + u_err
 		u_err 是一些误差，如死区
 	而两次正负电压注入可得
@@ -38,6 +42,8 @@ static void RsID_Init(MotorID_Param* rsparam)
 	两式相减，消去u_err，得到R_s为：
 		R_s = 2*u_d / ( +i_d-(-i_d) )
 	注意：参数辨析时，应当把rsid_param.Ud_Set设置值在1.0-2.0之间合适
+
+	当rsparam->Rsid_state为RsID_IDLE（每次辨析完会自动变成这个），且rsparam->RsID_Start给0就可实现再次电阻辨析
 */
 void RsID_Task(MotorID_Param* rsparam)
 {
@@ -120,6 +126,11 @@ void RsID_Task(MotorID_Param* rsparam)
 	}
 }
 
+/*********************************************************************************************************************/
+
+
+
+/********************************************电感辨析任务**************************************************************/
 
 //电感Ldq辨析初始化操作
 static void LdqID_Init(MotorID_Param* ldqparam)
@@ -133,6 +144,7 @@ static void LdqID_Init(MotorID_Param* ldqparam)
 	
 	ldqparam->Ldq_half_cnt = 0;        //计次比较先清0
 	ldqparam->half_index = 0;          //半个周期已执行个数清零
+	
 	ldqparam->iavgs_half_sum = 0.0f;   //清0每半周期的平均值
 	ldqparam->Ldq_cnt = 0;
 	ldqparam->Ldq_sum = 0.0f;
@@ -140,6 +152,14 @@ static void LdqID_Init(MotorID_Param* ldqparam)
 	ldqparam->i_max = -1e9f;
 	ldqparam->i_min =  1e9f;     
 	ldqparam->Ldq_done = 0;
+	
+	// 半周期积分法要用到的变量
+	ldqparam->i_start_half = 0.0f;
+	ldqparam->i_end_half   = 0.0f;
+	ldqparam->i_sum_half   = 0.0f;
+	ldqparam->i_cnt_half   = 0;
+	ldqparam->L_half_last   = 0.0f;
+	
 	
 	ldqparam->Lq_result = 0.0f;   //dq轴电感值清0
 	ldqparam->Ld_result = 0.0f;
@@ -177,40 +197,89 @@ void LdqID_Task(MotorID_Param* ldqparam)
 		//如果Ldq_select为0则辨析q轴电感，为0辨析d轴电感
 		float i_now = (ldqparam->Ldq_select == 0) ? pid_param.Iq_now : pid_param.Id_now;
 		
-		if(i_now > ldqparam->i_max) ldqparam->i_max = i_now;
-		if(i_now < ldqparam->i_min) ldqparam->i_min = i_now;
-		ldqparam->iavgs_half_sum += i_now;
-		ldqparam->Ldq_half_cnt++;
+		//新增*******************************
+    if(ldqparam->Ldq_half_cnt == 0)
+    {
+        ldqparam->i_start_half = i_now;
+        ldqparam->i_sum_half = 0.0f;
+        ldqparam->i_cnt_half = 0;
+    }
+		ldqparam->i_sum_half += i_now;
+    ldqparam->i_cnt_half++;
+    ldqparam->Ldq_half_cnt++;
+		//**********************************
+		
+//		if(i_now > ldqparam->i_max) ldqparam->i_max = i_now;
+//		if(i_now < ldqparam->i_min) ldqparam->i_min = i_now;
+//		ldqparam->iavgs_half_sum += i_now;
+//		ldqparam->Ldq_half_cnt++;
 		
 		if(ldqparam->Ldq_half_cnt>=ldqparam->half_cnts)   //已到达半个周期切换点
 		{
-			float i_half_avg = ldqparam->iavgs_half_sum / (float)ldqparam->Ldq_half_cnt;  //半周期内电流的平均值
-			float di_half = ldqparam->i_max - ldqparam->i_min;                            //半周期内的电流变化值
-			float dt = 0.5f / ldqparam->frequency_inject;   // 半周期时间
-			if(di_half > 0.02f)         //如果发现电流变化差值过小则不计算
+			//新增**************************
+			ldqparam->i_end_half = i_now;
+			float T_half = 0.5f / ldqparam->frequency_inject;
+			float i_avg  = ldqparam->i_sum_half / (float)ldqparam->i_cnt_half;
+			float di     = ldqparam->i_end_half - ldqparam->i_start_half;
+			
+			// 半周期积分法：
+			// L = (Ucmd - Rs*i_avg) * T_half / (i_end - i_start)
+			float Ueff = Ucmd - ldqparam->Rs_result * i_avg;
+			
+			// 防止除零或极小摆幅带来异常结果
+			if(fabsf(di) > 0.01f)
 			{
-				float Ueff;
-				
-				if(ldqparam->Rs_result>0.0f)
-					Ueff = ldqparam->Udq_inject - ldqparam->Rs_result * fabsf(i_half_avg);
-				else
-					Ueff = ldqparam->Udq_inject;  //如果发现辨析出来的相电阻有问题就去除
-				
-				if(Ueff>1e-5f)
-				{
-					float L_half = Ueff * dt / di_half;
-					ldqparam->Ldq_sum += L_half;
-					ldqparam->Ldq_cnt++;
-				}
+					float L_half = Ueff * T_half / di;
+
+					// 如果符号一致，L_half自然应为正
+					// 这里再做一次保护，只收正值
+					if(L_half > 0.00001f && L_half < 0.005f)
+					{
+							// 丢掉前几个半周期，只保留稳定后的结果
+							if(ldqparam->half_index >= 6)
+							{
+									ldqparam->Ldq_sum += L_half;
+									ldqparam->Ldq_cnt++;
+							}
+
+							ldqparam->L_half_last = L_half;
+					}
+			
 			}
 			
+			// 进入下一个半周期
 			ldqparam->half_index++;
-			
-			ldqparam->i_max = -1e5f;            //不直接赋值0，避免出现错误的di
-			ldqparam->i_min = +1e5f;
-			ldqparam->iavgs_half_sum = 0.0f;
 			ldqparam->Ldq_half_cnt = 0;
+			//******************************
+			
+//			float i_half_avg = ldqparam->iavgs_half_sum / (float)ldqparam->Ldq_half_cnt;  //半周期内电流的平均值
+//			float di_half = ldqparam->i_max - ldqparam->i_min;                            //半周期内的电流变化值
+//			float dt = 0.5f / ldqparam->frequency_inject;   // 半周期时间
+//			if(di_half > 0.02f)         //如果发现电流变化差值过小则不计算
+//			{
+//				float Ueff;
+//				
+//				if(ldqparam->Rs_result>0.0f)
+//					Ueff = ldqparam->Udq_inject - ldqparam->Rs_result * fabsf(i_half_avg);
+//				else
+//					Ueff = ldqparam->Udq_inject;  //如果发现辨析出来的相电阻有问题就去除
+//				
+//				if(Ueff>1e-5f)
+//				{
+//					float L_half = Ueff * dt / di_half;
+//					ldqparam->Ldq_sum += L_half;
+//					ldqparam->Ldq_cnt++;
+//				}
+//			}
+//			
+//			ldqparam->half_index++;
+//			
+//			ldqparam->i_max = -1e5f;            //不直接赋值0，避免出现错误的di
+//			ldqparam->i_min = +1e5f;
+//			ldqparam->iavgs_half_sum = 0.0f;
+//			ldqparam->Ldq_half_cnt = 0;
 		}
+		
 		if(ldqparam->half_index>=ldqparam->calculate_cnt)  //已满足执行次数
 		{
 			float L_result = 0.0f;
@@ -231,6 +300,12 @@ void LdqID_Task(MotorID_Param* ldqparam)
 		}
 	}
 }
+
+/*********************************************************************************************************************/
+
+
+
+/********************************************扫频法测电流环带宽任务****************************************************/
 
 /*
 	扫频法电流带宽测量初始化函数
@@ -292,12 +367,6 @@ void ScanFrequence_Start(ScanFre_Param* sf_p,float iq_bias,float iq_amp,float fr
 	
 	sf_p->scanfre_state = SCANFRE_IINIT;
 }
-
-
-
-
-
-
 
 
 /*
@@ -384,7 +453,6 @@ void ScanFrequence_Task(ScanFre_Param* sf_p)
 		
 	}
 }
-
 
 
 /*
@@ -475,5 +543,5 @@ void print_and_verify_frequencies(const float *freq_array_Hz, int num_points)
     printf("\n验证：相邻频率比应为常数。\n");
 }
 
-
+/*********************************************************************************************************************/
 
