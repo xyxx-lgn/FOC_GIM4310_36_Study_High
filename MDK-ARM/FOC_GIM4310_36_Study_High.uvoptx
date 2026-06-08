@@ -120,6 +120,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>DLGUARM</Key>
+          <Name>4鮑</Name>
         </SetRegEntry>
         <SetRegEntry>
           <Number>0</Number>
@@ -243,6 +244,11 @@
           <count>17</count>
           <WinNumber>1</WinNumber>
           <ItemText>rsid_param.Udq_inject</ItemText>
+        </Ww>
+        <Ww>
+          <count>18</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>motor_flag.Mode_Select</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>

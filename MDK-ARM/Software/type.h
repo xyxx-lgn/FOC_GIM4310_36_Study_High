@@ -10,6 +10,7 @@
 
 #define PI_F 3.14159265f                
 #define PI2_F 6.283185307f             
+#define Current_ISR_FRE   20000.0f     //电流环执行频率
 
 #define Limit(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
@@ -55,13 +56,14 @@ typedef enum
 //电机运行标志位结构体
 typedef struct  //所有标志位默认为0
 {
-	uint8_t Error_Flag;            //为1表示过压，2为欠压，3表示过流
-	uint8_t Adc_OffectOver_Flag;   //1代表ADC校准完成
-	uint8_t Zero_Flag;             //1代表零偏校准完成，默认为1，需要校准时再零偏校准
-	uint8_t Econder_Mode;          //编码器模式，1为开环自增角度，2为闭环真实角度
-	uint8_t Mode_Select;           //电机运行模式选择，1为SPWM运行，2为SVPWM运行，3为电流环运行，4为速度-电流环运行，5为位置-速度-电流环运行
-	VLimitMode v_limit_mode;       //dq轴电压限幅模式选择：1为q轴优先，2为d轴优先，3为等比例限幅
-	FOC_CC_DecouplingMode dec_mode;//电流环前馈控制模式选择，0不补偿，1dq轴解耦，2反电动势补偿，3都补偿
+	uint8_t Error_Flag;                //为1表示过压，2为欠压，3表示过流
+	uint8_t Adc_OffectOver_Flag;       //1代表ADC校准完成
+	uint8_t Zero_Flag;                 //1代表零偏校准完成，默认为1，需要校准时再零偏校准
+	uint8_t Econder_Mode;              //编码器模式，1为开环自增角度，2为闭环真实角度
+	uint8_t Mode_Select;               //电机运行模式选择，1为SPWM运行，2为SVPWM运行，3为电流环运行，4为速度-电流环运行，5为位置-速度-电流环运行
+	VLimitMode v_limit_mode;           //dq轴电压限幅模式选择：1为q轴优先，2为d轴优先，3为等比例限幅
+	FOC_CC_DecouplingMode dec_mode;    //电流环前馈控制模式选择，0不补偿，1dq轴解耦，2反电动势补偿，3都补偿
+	uint8_t Death_Compensation_Enable; //死区补偿使能标志位，为1开启死区补偿，0不补偿
 	uint8_t pid_param_flag;    
 }Motor_Flag;
 
@@ -156,26 +158,24 @@ typedef struct
 	float frequency_inject;   //注入方波频率值
 	uint8_t Ldq_select;       //dq轴电感测量，默认为0辨析q轴电感，1辨析d轴电感
 	
-	uint16_t half_cnts;       //半个周期需要计次值
+	uint16_t half_cnts;       //计算出半个周期需要计次值总是多少
 	uint16_t Ldq_half_cnt;    //半个周期计次值，对比看是否该执行下半个周期
 	uint16_t half_index;      //半个周期计次数，看完成了多少半个周期
 	uint16_t calculate_cnt;   //计算周期总执行次数
-	uint16_t Ldq_cnt;         //实际dq轴半周期计算的完成次数
-	uint16_t LdqID_Start;     //电感辨析初始化完成标志位
+	uint16_t Ldq_cnt;         //实际计算的电感L的次数
 	
-	float i_max,i_min;        //拿半个周期内电流变化率累计求和来求解电感
-	float iavgs_half_sum;     //每半个周期电流平均值
+	uint16_t LdqID_Start;     //电感辨析初始化完成标志位
+	uint16_t Ldq_done;        //电感辨析结束标志位
+	
 	float Ldq_sum;            //最终所有半周期计算累计的电感和
 	
 	float i_start_half;        // 半周期起点电流
 	float i_end_half;          // 半周期终点电流
 	float i_sum_half;          // 半周期电流累加
-	uint16_t i_cnt_half;       // 半周期采样计数
-	float L_half_last;         // 最近一次半周期算出的L，方便调试观察
 	
 	float Lq_result;          //q轴电感求解值
 	float Ld_result;          //d轴电感求解值
-	uint16_t Ldq_done;        //电感辨析结束标志位
+
 	
 }MotorID_Param;
 
@@ -200,7 +200,7 @@ typedef enum
 	SCANFRE_DONE                //扫频法完成状态
 }ScanFre_State;
 
-//3銆佹壂棰戠粨鏋勪綋
+//扫频法结构体汇总
 typedef struct
 {
 	ScanFre_State scanfre_state;   

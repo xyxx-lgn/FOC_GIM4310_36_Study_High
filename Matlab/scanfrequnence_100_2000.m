@@ -6,7 +6,7 @@ close all;
 % 用户参数
 % =========================
 Fs = 20000;                           % 控制/采样频率 Hz
-file = 'scan_100_4000hz_PI200_ori.csv';   % VOFA导出文件
+file = 'scan_100_4000hz_PI2000.csv';   % VOFA导出文件
 discard_ratio = 0.30;                 % 每个频点丢弃前30%过渡段
 min_points = 20;                      % 每个频点最少点数
 

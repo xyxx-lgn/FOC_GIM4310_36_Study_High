@@ -5,7 +5,7 @@ extern ADCTask_Param adctask_param;          //ADC采样任务参数
 extern SPWM_Param spwm_param;         //SPWM生成的过程参数
 extern SVPWM_Param svpwm_param;        //SPWM生成的过程参数
 extern EncoderTask_Param encodertask_param;  //编码器任务结构体
-
+extern Motor_Flag motor_flag;                //电机标志位结构体
 
 
 extern uint8_t adc_map[3];
@@ -35,6 +35,25 @@ float Angle_Limit(float input_angle,float limit)   //耗时510ns
 	
 	return input_angle;
 }
+
+
+//死区补偿平滑符号函数，带一个[-th,th]的死区,避免
+//零点附近因为噪声导致补偿符号来回跳
+static float sign_smooth(float x,float th)
+{
+    if (x >= th)  return 1.0f;
+    if (x <= -th) return -1.0f;
+    return x / th;   // 在[-th, th]内线性过渡
+}
+
+//死区补偿一阶低通滤波器，使用滤波后电流进行方向判断，系数k越小滤波效果越强
+//y[n] = α * x[n] + (1-α) * y[n-1]= y[n-1] + α * (x[n] - y[n-1])
+static float Low_Pass_Fliter_Death(float in,float *last_out,float k)
+{
+	*last_out += k*(in - *last_out);
+	return *last_out;
+}
+
 
 void Set_SPWM(float Uq,float Ud,SPWM_Param* spwm_param)     //耗时3.2us
 {
@@ -96,8 +115,32 @@ void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param) //�
 	//2、反帕克变化，将Uq，Ud ->Ualpha，Ubeta
 	arm_inv_park_f32(Ud,Uq,&Ualpha,&Ubeta,sin_dsp,cos_dsp);
 	
-//	Ualpha = -Ualpha;
-//	Ubeta = -Ubeta; 
+	if(motor_flag.Death_Compensation_Enable == 1)  //死区补偿开启
+	{
+		//(1)先进行参数初始化，并对三相电流进行轻微滤波
+		static float ia_filt = 0.0f;    //三相滤波后电流
+		static float ib_filt = 0.0f;
+		static float ic_filt = 0.0f;
+		const float k_lpfd = 0.10f;     //死区补偿电流一阶低通滤波系数k
+		const float i_th = 0.05f;      //零点平滑阈值(A)
+		const float u_dt = 300.0f*1e-6*Current_ISR_FRE*24.0f; //等效死区补偿电压(V)，算出来约为0.15~0.25直接，也可以自行计算，或者直接给值补偿或者乘个系数放大
+		
+		ia_filt = Low_Pass_Fliter_Death(adctask_param.Ia, &ia_filt, k_lpfd);
+		ib_filt = Low_Pass_Fliter_Death(adctask_param.Ib, &ib_filt, k_lpfd);
+		ic_filt = Low_Pass_Fliter_Death(adctask_param.Ic, &ic_filt, k_lpfd);
+		
+		//(2)三相电流方向判定
+		float signa = sign_smooth(ia_filt, i_th);
+		float signb = sign_smooth(ib_filt, i_th);
+		float signc = sign_smooth(ic_filt, i_th);
+		
+		//(3)将三相符号映射回alpha-beta补偿矢量,并赋值
+		float u_alpha_comp = (2.0f * signa - signb - signc) * 0.3333333333f * u_dt;   //0.333=1/3
+		float u_beta_comp  = (signb - signc) * 0.57735026919f * u_dt;    //1/sqrt(3) = 0.57735
+		
+		Ualpha += u_alpha_comp;
+		Ubeta  += u_beta_comp;
+	}
 	
 	//3、线性圆限幅，最大相电压 = Udc/√3
 	float Umax = svpwm_param->Udc * _1_sqrt3;   //判断电压矢量是否超出Udc/sqrt3

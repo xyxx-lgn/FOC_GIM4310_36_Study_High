@@ -12,7 +12,7 @@ extern ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
 extern ScanFre_Param scanfre_param;             //扫频法测带宽结构体
 
 
-#define Current_ISR_FRE   20000.0f     //电流环执行频率
+
 
 
 /********************************************电阻辨析任务**************************************************************/
@@ -131,7 +131,6 @@ void RsID_Task(MotorID_Param* rsparam)
 
 
 /********************************************电感辨析任务**************************************************************/
-
 //电感Ldq辨析初始化操作
 static void LdqID_Init(MotorID_Param* ldqparam)
 {
@@ -139,26 +138,24 @@ static void LdqID_Init(MotorID_Param* ldqparam)
 //	ldqparam->frequency_inject = 400;    //注入方波频率，要小于电流环执行频率
 	ldqparam->lock_angle = encodertask_param.Return_Angle;   //确保辨析过程中保持该角度不变
 	
-	ldqparam->half_cnts = (uint16_t)(Current_ISR_FRE*0.5f/ldqparam->frequency_inject);  //求得半个周期下对应注入频率的计次值
+	//求得半个周期下对应注入频率的计次值
+	ldqparam->half_cnts = (uint16_t)(Current_ISR_FRE*0.5f/ldqparam->frequency_inject);  
 	ldqparam->calculate_cnt = 2*30;       //执行完整的30次方波周期计算
 	
 	ldqparam->Ldq_half_cnt = 0;        //计次比较先清0
 	ldqparam->half_index = 0;          //半个周期已执行个数清零
 	
-	ldqparam->iavgs_half_sum = 0.0f;   //清0每半周期的平均值
+
 	ldqparam->Ldq_cnt = 0;
 	ldqparam->Ldq_sum = 0.0f;
 	
-	ldqparam->i_max = -1e9f;
-	ldqparam->i_min =  1e9f;     
+    
 	ldqparam->Ldq_done = 0;
 	
 	// 半周期积分法要用到的变量
 	ldqparam->i_start_half = 0.0f;
 	ldqparam->i_end_half   = 0.0f;
 	ldqparam->i_sum_half   = 0.0f;
-	ldqparam->i_cnt_half   = 0;
-	ldqparam->L_half_last   = 0.0f;
 	
 	
 	ldqparam->Lq_result = 0.0f;   //dq轴电感值清0
@@ -173,18 +170,21 @@ static void LdqID_Init(MotorID_Param* ldqparam)
 	U = Rs*i_avgs + L*di/dt
 	可以由该式子推出
 	L = {(U-Rs*i_avgs)*dt} / di
-	其中di = i_max - i_min （半个周期内）,不用担心正负半周期的极性问题，
+	其中di = i_end - i_start （半个周期内）,不用担心正负半周期的极性问题，
 	由于负半周期，U也会改成负值，所以给抵消了
 	dt = T/2 = 0.5*（1/f_inject） 
 	如果注入频率够高，可以忽略Rs*i_avgs，因为此时电感阻抗高，为大占比
+	可将LdqID_Start设置为0来再次进行辨析
 */
 void LdqID_Task(MotorID_Param* ldqparam)
 {
+	//1、初始化参数设置
 	if(ldqparam->LdqID_Start == 0)  //执行初始化操作
 		LdqID_Init(ldqparam);    
 	
-	if(ldqparam->Ldq_done == 0)
+	if(ldqparam->Ldq_done == 0)   //如果没有完成则进行电感辨析
 	{
+		//2、判断正负周期，并设定注入电压，求得半周期起始电流和实时电流
 		//判断目前正、负半周期，求得方波符号:奇数：-U，偶数：+U
 		float sign = (ldqparam->half_index&0x01)?-1.0f:1.0f;
 		float Ucmd = sign*ldqparam->Udq_inject;
@@ -197,29 +197,20 @@ void LdqID_Task(MotorID_Param* ldqparam)
 		//如果Ldq_select为0则辨析q轴电感，为0辨析d轴电感
 		float i_now = (ldqparam->Ldq_select == 0) ? pid_param.Iq_now : pid_param.Id_now;
 		
-		//新增*******************************
-    if(ldqparam->Ldq_half_cnt == 0)
+    if(ldqparam->Ldq_half_cnt == 0)  //记录起始电流值
     {
         ldqparam->i_start_half = i_now;
         ldqparam->i_sum_half = 0.0f;
-        ldqparam->i_cnt_half = 0;
     }
 		ldqparam->i_sum_half += i_now;
-    ldqparam->i_cnt_half++;
     ldqparam->Ldq_half_cnt++;
-		//**********************************
-		
-//		if(i_now > ldqparam->i_max) ldqparam->i_max = i_now;
-//		if(i_now < ldqparam->i_min) ldqparam->i_min = i_now;
-//		ldqparam->iavgs_half_sum += i_now;
-//		ldqparam->Ldq_half_cnt++;
-		
+
+		//3、到达半周期后记录半周期末电流值，并计算半周期电感L
 		if(ldqparam->Ldq_half_cnt>=ldqparam->half_cnts)   //已到达半个周期切换点
 		{
-			//新增**************************
 			ldqparam->i_end_half = i_now;
 			float T_half = 0.5f / ldqparam->frequency_inject;
-			float i_avg  = ldqparam->i_sum_half / (float)ldqparam->i_cnt_half;
+			float i_avg  = ldqparam->i_sum_half / (float)ldqparam->Ldq_half_cnt;
 			float di     = ldqparam->i_end_half - ldqparam->i_start_half;
 			
 			// 半周期积分法：
@@ -229,11 +220,10 @@ void LdqID_Task(MotorID_Param* ldqparam)
 			// 防止除零或极小摆幅带来异常结果
 			if(fabsf(di) > 0.01f)
 			{
-					float L_half = Ueff * T_half / di;
+					float L_half = Ueff * T_half / di;  //计算电感
 
-					// 如果符号一致，L_half自然应为正
-					// 这里再做一次保护，只收正值
-					if(L_half > 0.00001f && L_half < 0.005f)
+					//给一个计算出来的估计值进行上下限判断，过于离谱的值舍去
+					if(L_half > 0.00001f && L_half < 0.005f)  
 					{
 							// 丢掉前几个半周期，只保留稳定后的结果
 							if(ldqparam->half_index >= 6)
@@ -241,45 +231,14 @@ void LdqID_Task(MotorID_Param* ldqparam)
 									ldqparam->Ldq_sum += L_half;
 									ldqparam->Ldq_cnt++;
 							}
-
-							ldqparam->L_half_last = L_half;
 					}
-			
 			}
-			
 			// 进入下一个半周期
 			ldqparam->half_index++;
 			ldqparam->Ldq_half_cnt = 0;
-			//******************************
-			
-//			float i_half_avg = ldqparam->iavgs_half_sum / (float)ldqparam->Ldq_half_cnt;  //半周期内电流的平均值
-//			float di_half = ldqparam->i_max - ldqparam->i_min;                            //半周期内的电流变化值
-//			float dt = 0.5f / ldqparam->frequency_inject;   // 半周期时间
-//			if(di_half > 0.02f)         //如果发现电流变化差值过小则不计算
-//			{
-//				float Ueff;
-//				
-//				if(ldqparam->Rs_result>0.0f)
-//					Ueff = ldqparam->Udq_inject - ldqparam->Rs_result * fabsf(i_half_avg);
-//				else
-//					Ueff = ldqparam->Udq_inject;  //如果发现辨析出来的相电阻有问题就去除
-//				
-//				if(Ueff>1e-5f)
-//				{
-//					float L_half = Ueff * dt / di_half;
-//					ldqparam->Ldq_sum += L_half;
-//					ldqparam->Ldq_cnt++;
-//				}
-//			}
-//			
-//			ldqparam->half_index++;
-//			
-//			ldqparam->i_max = -1e5f;            //不直接赋值0，避免出现错误的di
-//			ldqparam->i_min = +1e5f;
-//			ldqparam->iavgs_half_sum = 0.0f;
-//			ldqparam->Ldq_half_cnt = 0;
 		}
 		
+		//4、到达指定执行周期数，将所有半周期电感进行平均，求出最终电感L
 		if(ldqparam->half_index>=ldqparam->calculate_cnt)  //已满足执行次数
 		{
 			float L_result = 0.0f;
@@ -291,7 +250,7 @@ void LdqID_Task(MotorID_Param* ldqparam)
 			else
 				ldqparam->Ld_result = L_result;
 			
-			Set_Svpwm(0.0f,0.0f,ldqparam->lock_angle,&svpwm_param);         //电压设置取消 
+			Set_Svpwm(0.0f,0.0f,ldqparam->lock_angle,&svpwm_param);//电压设置取消 
 			
 			ldqparam->Ldq_cnt = 0;
 			ldqparam->Ldq_sum = 0.0f;
