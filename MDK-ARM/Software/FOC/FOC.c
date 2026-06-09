@@ -6,7 +6,7 @@ extern SPWM_Param spwm_param;         //SPWM生成的过程参数
 extern SVPWM_Param svpwm_param;        //SPWM生成的过程参数
 extern EncoderTask_Param encodertask_param;  //编码器任务结构体
 extern Motor_Flag motor_flag;                //电机标志位结构体
-
+extern PID_Param pid_param;                  //PID参数结构体
 
 extern uint8_t adc_map[3];
 extern uint8_t pwm_map[3];
@@ -112,34 +112,56 @@ void Set_Svpwm(float Uq,float Ud,float ElectAngle,SVPWM_Param* svpwm_param) //�
 	float sin_dsp,cos_dsp;
 	arm_sin_cos_f32(ElectAngle,&sin_dsp,&cos_dsp);        //角度传参为角度值,求解三角函数值
 	
-	//2、反帕克变化，将Uq，Ud ->Ualpha，Ubeta
+	//2、反帕克变化，将Uq，Ud ->Ualpha，Ubeta，同时死区补偿在这之后进行
 	arm_inv_park_f32(Ud,Uq,&Ualpha,&Ubeta,sin_dsp,cos_dsp);
 	
-	if(motor_flag.Death_Compensation_Enable == 1)  //死区补偿开启
+	//死区补偿开启，按照VESC死区补偿进行，在本电机上补偿效果不佳，建议关闭
+	if(motor_flag.Death_Compensation_Enable == 1)  
 	{
 		//(1)先进行参数初始化，并对三相电流进行轻微滤波
-		static float ia_filt = 0.0f;    //三相滤波后电流
-		static float ib_filt = 0.0f;
-		static float ic_filt = 0.0f;
-		const float k_lpfd = 0.10f;     //死区补偿电流一阶低通滤波系数k
-		const float i_th = 0.05f;      //零点平滑阈值(A)
-		const float u_dt = 300.0f*1e-6*Current_ISR_FRE*24.0f; //等效死区补偿电压(V)，算出来约为0.15~0.25直接，也可以自行计算，或者直接给值补偿或者乘个系数放大
+		const float k_lpfd = 0.10f;                                 //死区补偿电流一阶低通滤波系数k
+		const float i_th = 0.05f;                                   //零点平滑阈值(A)
+		const float dead_comp_scale = 0.05f;                        //死区补偿电压系数
+		const float u_factor = 0.24f*1e-6*Current_ISR_FRE;          //死区补偿系数，其中0.24代表240ns死区时间
+		//等效死区补偿电压(V)，算出来约为0.15~0.25直接，也可以自行计算，或者直接给值补偿或者乘个系数放大
+		float u_dt = dead_comp_scale*u_factor*svpwm_param->Udc;     //根据实时电压波动调整补偿电压值
 		
-		ia_filt = Low_Pass_Fliter_Death(adctask_param.Ia, &ia_filt, k_lpfd);
-		ib_filt = Low_Pass_Fliter_Death(adctask_param.Ib, &ib_filt, k_lpfd);
-		ic_filt = Low_Pass_Fliter_Death(adctask_param.Ic, &ic_filt, k_lpfd);
+		static float id_dt_filt = 0.0f;
+		static float iq_dt_filt = 0.0f;
 		
-		//(2)三相电流方向判定
-		float signa = sign_smooth(ia_filt, i_th);
-		float signb = sign_smooth(ib_filt, i_th);
-		float signc = sign_smooth(ic_filt, i_th);
+		// 1)对dq电流做轻滤波
+		id_dt_filt = Low_Pass_Fliter_Death(pid_param.Id_now,&id_dt_filt, k_lpfd);
+		iq_dt_filt = Low_Pass_Fliter_Death(pid_param.Iq_now,&iq_dt_filt, k_lpfd);
 		
-		//(3)将三相符号映射回alpha-beta补偿矢量,并赋值
+		// 2)dq -> alpha beta
+		float i_alpha_filt, i_beta_filt;
+		arm_inv_park_f32(id_dt_filt, iq_dt_filt, &i_alpha_filt, &i_beta_filt, sin_dsp, cos_dsp);
+
+		// 3)alpha beta -> abc
+		float ia_logic = i_alpha_filt;
+		float ib_logic = -0.5f * i_alpha_filt + 0.86602540378f * i_beta_filt;
+		float ic_logic = -0.5f * i_alpha_filt - 0.86602540378f * i_beta_filt;
+		
+		// 4)三相电流符号判定
+		float signa = sign_smooth(ia_logic, i_th);
+		float signb = sign_smooth(ib_logic, i_th);
+		float signc = sign_smooth(ic_logic, i_th);
+		
+		// 5)小电流区禁用补偿
+		float i_mag = sqrtf(id_dt_filt * id_dt_filt + iq_dt_filt * iq_dt_filt);   //电流禁用区
+		if (i_mag<0.35f) 
+		{
+			signa = 0.0f;
+			signb = 0.0f;
+			signc = 0.0f;
+		}
+		
+		// 6)将三相符号映射回alpha-beta补偿矢量,并赋值
 		float u_alpha_comp = (2.0f * signa - signb - signc) * 0.3333333333f * u_dt;   //0.333=1/3
 		float u_beta_comp  = (signb - signc) * 0.57735026919f * u_dt;    //1/sqrt(3) = 0.57735
 		
-		Ualpha += u_alpha_comp;
-		Ubeta  += u_beta_comp;
+		Ualpha -= u_alpha_comp;  //进行alpha-beta系补偿，根据需求调整补偿方向，可能取负号
+		Ubeta  -= u_beta_comp;
 	}
 	
 	//3、线性圆限幅，最大相电压 = Udc/√3

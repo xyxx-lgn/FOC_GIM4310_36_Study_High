@@ -120,7 +120,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>DLGUARM</Key>
-          <Name>4鮑</Name>
+          <Name>岞?</Name>
         </SetRegEntry>
         <SetRegEntry>
           <Number>0</Number>
@@ -178,77 +178,32 @@
         <Ww>
           <count>4</count>
           <WinNumber>1</WinNumber>
-          <ItemText>pid_param.Kp_I</ItemText>
+          <ItemText>motor_flag.Econder_Mode,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>5</count>
           <WinNumber>1</WinNumber>
-          <ItemText>pid_param.Ki_I</ItemText>
+          <ItemText>encodertask_param.Return_Angle,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>6</count>
           <WinNumber>1</WinNumber>
-          <ItemText>motor_param.I_Width</ItemText>
+          <ItemText>motor_flag.Death_Compensation_Enable,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>7</count>
           <WinNumber>1</WinNumber>
-          <ItemText>motor_flag.Econder_Mode,0x0A</ItemText>
+          <ItemText>motor_flag.pid_param_flag,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>8</count>
           <WinNumber>1</WinNumber>
-          <ItemText>encodertask_param.Return_Angle,0x0A</ItemText>
+          <ItemText>motor_param.I_Width</ItemText>
         </Ww>
         <Ww>
           <count>9</count>
           <WinNumber>1</WinNumber>
-          <ItemText>motor_flag.pid_param_flag,0x0A</ItemText>
-        </Ww>
-        <Ww>
-          <count>10</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>scanfre_param.frequence_hz</ItemText>
-        </Ww>
-        <Ww>
-          <count>11</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>scanfre_param.start_flag,0x0A</ItemText>
-        </Ww>
-        <Ww>
-          <count>12</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>scanfre_param.done_flag,0x0A</ItemText>
-        </Ww>
-        <Ww>
-          <count>13</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>scanfre_param.scanfre_state,0x0A</ItemText>
-        </Ww>
-        <Ww>
-          <count>14</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>rsid_param.LdqID_Start,0x0A</ItemText>
-        </Ww>
-        <Ww>
-          <count>15</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>rsid_param.Ldq_select,0x0A</ItemText>
-        </Ww>
-        <Ww>
-          <count>16</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>rsid_param.frequency_inject</ItemText>
-        </Ww>
-        <Ww>
-          <count>17</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>rsid_param.Udq_inject</ItemText>
-        </Ww>
-        <Ww>
-          <count>18</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>motor_flag.Mode_Select</ItemText>
+          <ItemText>dead_comp_scale</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>

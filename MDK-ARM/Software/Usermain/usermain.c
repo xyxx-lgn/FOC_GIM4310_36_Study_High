@@ -55,7 +55,7 @@ void Data_Init()
 	motor_param.Tpwm = 8400;                          //定时器计数最大值
 	motor_param.Rs = 0.01;                            //采样电阻值大小
 	motor_param.Gain = 50;                            //运算放大器增益
-	motor_param.I_Width = 1000.0f;                     //电机电流环带宽大小
+	motor_param.I_Width = 600.0f;                     //电机电流环带宽大小
 	
 	//电机运行标志位结构体
 	motor_flag.Zero_Flag = 1;                          //默认零偏校准标志位为1，避免每次启动都校准
@@ -63,6 +63,7 @@ void Data_Init()
 	motor_flag.Mode_Select = 3; 
 	motor_flag.v_limit_mode = V_LIMIT_VECTOR;          //3种电压限幅，分别为q轴优先，d轴优先，等比例限幅
 	motor_flag.dec_mode = FOC_CC_DECOUPLING_DISABLED;  //电流环前馈补偿选择，分别为不补偿，dq轴补偿，反电动势补偿，都补偿
+	motor_flag.Death_Compensation_Enable = 0;          //死区补偿开始，1为开启，0为关闭，在GIM4310-36这个板子和电机上使用时发现效果不佳，因此关闭死区补偿
 	
 	//SPWM生成的过程参数
 	spwm_param.supply_Udc = motor_param.supply_Udc;      //SPWM电压抬升
