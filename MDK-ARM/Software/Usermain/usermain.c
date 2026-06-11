@@ -107,19 +107,19 @@ void Data_Init()
 	
 	//电感参数辨析
 	rsid_param.Udq_inject = 1.0f;
-	rsid_param.frequency_inject = 400;
-	rsid_param.Ldq_select = 1;
-	rsid_param.Ldq_half_cnt = 0;
-	rsid_param.half_index = 0;
-	rsid_param.LdqID_Start = 0;          //Ld 0.0004164f      Lq 0.0003968f   取Lq=Ld=0.000405f
+	rsid_param.frequency_inject = 400;   //电感辨析注入频率，可以更改，默认400，过小，电机电阻压降影响大，过大，采样点过少
+	rsid_param.Ldq_select = 1;           //dq电感辨析选择标志位，默认为0辨析q轴电感，1辨析d轴电感
+	rsid_param.Ldq_half_cnt = 0;         //计算出半个周期内当前计次值是多少
+	rsid_param.half_index = 0;           ///半个周期计次数，看完成了多少半个周期
+	rsid_param.LdqID_Start = 0;          //   Ld 0.0004164f      Lq 0.0003968f   取Lq=Ld=0.000405f
 	
 	//扫频法测电流环带宽
-	ScanFrequence_Init(&scanfre_param);
-	scanfre_param.scanfre_buff = scanfre_buff;
-	scanfre_param.frequence_hz = 100;
-	scanfre_param.start_flag=0;
-	scanfre_param.done_flag=0;
-	scanfre_param.scanfre_state = SCANFRE_IDLE;
+	ScanFrequence_Init(&scanfre_param);          //扫频法初始化参数
+	scanfre_param.scanfre_buff = scanfre_buff;   //扫频法过程数据存储区，就是通过这里面的4类数据发给matlab进行频域分析
+	scanfre_param.frequence_hz = 100;            //默认设置扫频当前频率，可根据扫频处函数去设定起始和最高频率，并中间对数插值处理
+	scanfre_param.start_flag=0;                  //scanfre_param.start_flag==0 && scanfre_param.done_flag==0 && scanfre_param.scanfre_state == SCANFRE_IDLE
+	scanfre_param.done_flag=0;                   //即上面三种情况同时成立下重新进行一次进行扫频，默认完成一次扫频done_flag置1
+	scanfre_param.scanfre_state = SCANFRE_IDLE;  //当scanfre_state不是SCANFRE_IDLE意味着扫频进行中
 }
 
 

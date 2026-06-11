@@ -43,7 +43,7 @@ static void RsID_Init(MotorID_Param* rsparam)
 		R_s = 2*u_d / ( +i_d-(-i_d) )
 	注意：参数辨析时，应当把rsid_param.Ud_Set设置值在1.0-2.0之间合适
 
-	当rsparam->Rsid_state为RsID_IDLE（每次辨析完会自动变成这个），且rsparam->RsID_Start给0就可实现再次电阻辨析
+	当rsparam->Rsid_state为RsID_IDLE（每次辨析完会自动变成这个），且rsparam->RsID_Start给0就可实现再次电阻辨析！！！！！！！！！
 */
 void RsID_Task(MotorID_Param* rsparam)
 {
@@ -174,7 +174,8 @@ static void LdqID_Init(MotorID_Param* ldqparam)
 	由于负半周期，U也会改成负值，所以给抵消了
 	dt = T/2 = 0.5*（1/f_inject） 
 	如果注入频率够高，可以忽略Rs*i_avgs，因为此时电感阻抗高，为大占比
-	可将LdqID_Start设置为0来再次进行辨析
+
+	可将LdqID_Start设置为0来再次进行辨析！！！！！！！！！！！！！！
 */
 void LdqID_Task(MotorID_Param* ldqparam)
 {

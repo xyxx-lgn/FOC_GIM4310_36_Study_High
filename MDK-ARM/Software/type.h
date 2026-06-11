@@ -133,7 +133,7 @@ typedef enum
 	RsID_Done                //参数辨析完成
 }RsID_State;
 
-//电阻参数辨析结构体参数
+//电机参数辨析结构体参数
 typedef struct
 {
 	//Rs电阻辨析
@@ -155,7 +155,7 @@ typedef struct
 	
 	//Ld、Lq电感辨析
 	float Udq_inject;         //相电感Udq注入电压大小
-	float frequency_inject;   //注入方波频率值
+	float frequency_inject;   //注入方波频率值，可以进行更改，不要过低，过低时电机电阻压降影响大
 	uint8_t Ldq_select;       //dq轴电感测量，默认为0辨析q轴电感，1辨析d轴电感
 	
 	uint16_t half_cnts;       //计算出半个周期需要计次值总是多少
@@ -207,26 +207,29 @@ typedef struct
 	
 	ScanFre_Sample* scanfre_buff;  //扫频法采集的结构体数组
 	
-	uint8_t start_flag;
-	uint8_t done_flag;
+	uint8_t start_flag;           //扫频法开启标志位，为1表示初始化完成
+	uint8_t done_flag;            //扫频法结束标志位，为1表示此次频率扫频完成
 	
-	float frequence_hz;
-	float iq_bias;
-	float iq_amp;
-	float iq_ref;
-	float lock_angle;
+	float frequence_hz;           //当前扫频频率设定
+	float iq_bias;                //扫频直流分量大小，默认设置为0
+	float iq_amp;                 //扫频幅值大小设定
+	float iq_ref;                 //扫频法当前目标值设定，iq_ref = iq_bias + iq_amp*arm_sin_f32(phase);
+	float lock_angle;             //当前扫频时的锁轴角度，无意义，可以对照参考扫频时电机是否有大抖动
 	
-	float phase;
-	float phase_step;
+	float phase;                  //当前相位值
+	float phase_step;             //当前频率下的相位步进值
 	
-	uint16_t wait_cycle;
-	uint16_t sample_cycle;
-	uint16_t wait_cnt;
-	uint16_t sample_cnt;
-	uint16_t cnt_now;
+	uint16_t wait_cycle;          //等待稳定的周期数，不使用该周期时的数据
+	uint16_t sample_cycle;        //采样周期数，采集sample_cycle个周期的数据
+	uint16_t wait_cnt;            //等待稳定周期数所需的总计次值
+	uint16_t sample_cnt;          //采样周期所需的的总计次值
+	uint16_t cnt_now;             //当前计次值，用于比较确定当前处于什么状态
 	
-	uint16_t buf_len;
-	uint16_t buf_now;
+	uint16_t buf_len;             //采样存储数组长度
+	uint16_t buf_now;             //采样存储数组当前的下标值
 }ScanFre_Param;
+
+
+
 
 #endif
