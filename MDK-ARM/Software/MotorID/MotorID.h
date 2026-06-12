@@ -12,5 +12,5 @@ void ScanFrequence_Task(ScanFre_Param* sf_p);
 void ScanFrequence_PrintBuff(void);
 int generate_bode_frequencies(float start_freq_Hz,float end_freq_Hz,int num_points,float *freq_array_Hz);
 void print_and_verify_frequencies(const float *freq_array_Hz, int num_points);
-
+void SpeedID_Kw_Task(PID_Param* p);
 #endif

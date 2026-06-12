@@ -505,3 +505,51 @@ void print_and_verify_frequencies(const float *freq_array_Hz, int num_points)
 
 /*********************************************************************************************************************/
 
+
+
+
+
+
+/*********************************************Kw辨析任务**************************************************************/
+/*
+	Kω = Kt/J，辨析Kw用于整定速度环PI参数
+	因为在速度环PI里面：
+	Kp = 2ζωn / Kω
+	Ki_cont = ωn^2 / Kω ，Ki离散化还要乘执行周期Ts_v,即速度环执行周期
+	ωn = 2π*f_bw_speed
+	阻尼比ζ一般取0.707
+	速度环模型简化有：J * dω/dt = Kt * Iq  得出-> dω/dt = (Kt/J) * Iq = Kω * Iq
+*/
+void SpeedID_Kw_Task(PID_Param* p)
+{
+    // 1kHz任务里调用
+    static uint16_t cnt = 0;
+    cnt++;
+
+    p->Id_aim = 0.0f;
+
+    // 0~200ms: 0A
+    if (cnt < 200) {
+        p->Iq_aim = 0.0f;
+    }
+    // 200~500ms: +0.2A
+    else if (cnt < 500) {
+        p->Iq_aim = 0.2f;
+    }
+    // 500~700ms: 0A
+    else if (cnt < 700) {
+        p->Iq_aim = 0.0f;
+    }
+    // 700~1000ms: -0.2A
+    else if (cnt < 1000) {
+        p->Iq_aim = -0.2f;
+    }
+    // 1000~1200ms: 0A
+    else if (cnt < 1200) {
+        p->Iq_aim = 0.0f;
+    }
+    else {
+        cnt = 0;
+    }
+}
+

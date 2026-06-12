@@ -11,6 +11,7 @@
 #define PI_F 3.14159265f                
 #define PI2_F 6.283185307f             
 #define Current_ISR_FRE   20000.0f     //电流环执行频率
+#define Speed_ISR_FRE  1000.0f         //速度环执行频率
 
 #define Limit(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
@@ -34,6 +35,8 @@ typedef struct
 	float Rs;              //采样电阻大小
 	float Gain;            //运放增益大小
 	float I_Width;         //电流环带宽大小
+	float Kw;              //Kw = Kt/J,单位：rad/s2/A，用于速度环PI整定使用
+	float Speed_Width;     //速度环带宽大小
 }Motor_Param;  
 
 //dq轴电压限幅策略选择
@@ -112,6 +115,7 @@ typedef struct
 
 typedef struct
 {
+	//电流环参数
 	float Kp_I,Ki_I;
 	float Iq_aim,Id_aim;
 	float Iq_now,Id_now;
@@ -120,6 +124,26 @@ typedef struct
 	float erro_iq_sum,erro_id_sum;
 	float Uq,Ud;
 	float Uout_Max;
+	
+	//速度环参数
+	float Kp_S,Ki_S;                //速度环PI参数
+	
+	float Speed_now;      //输出轴实际速度，单位：rad/s
+	float Speed_filt;               //输出轴滤波速度
+	float Motor_Speed_aim,Motor_Speed_now;          //电机轴原始机械速度(过减速器前速度)，rad/s
+	float Motor_Speed_filt_now;     //电机轴滤波机械速度，rad/s
+	
+	float Speed_lpf_k;              //速度一阶低通滤波系数
+	float Speed_erro_sum;           //速度积分项
+	float Speed_KISumMax;           //速度积分限幅
+	float Speed_Max;                //速度环设置限幅(速度设置为输出轴速度限制，单位rad/s)
+	
+	uint16_t Speed_Div;             //分频系数，决定速度环执行频率,电流环执行频率/Speed_Div = 速度环执行频率
+	uint16_t Speed_cnt;             //分频计数
+	float _1_Ts;                       //速度环周期倒数（1/s），计算速度的时候进行乘法
+	
+	float Shaft_Angle_Last;         //上一次机械角度（deg）
+	
 }PID_Param;
 
 //电阻参数辨析状态

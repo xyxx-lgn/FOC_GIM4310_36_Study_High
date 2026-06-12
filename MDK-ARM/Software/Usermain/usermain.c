@@ -56,6 +56,8 @@ void Data_Init()
 	motor_param.Rs = 0.01;                            //采样电阻值大小
 	motor_param.Gain = 50;                            //运算放大器增益
 	motor_param.I_Width = 600.0f;                     //电机电流环带宽大小
+	motor_param.Kw = 2400.0f;                         //Kw = Kt/J,单位：rad/s2/A，用于速度环PI整定使用
+	motor_param.Speed_Width = 8.0f;                  //速度环带宽大小
 	
 	//电机运行标志位结构体
 	motor_flag.Zero_Flag = 1;                          //默认零偏校准标志位为1，避免每次启动都校准
@@ -89,16 +91,43 @@ void Data_Init()
 	
 	
 	//PID参数
-	pid_param.Iqd_Max = 2.97; //电流限幅3.3A*0.9，大于这个值会削顶（1.65/50/0.01 = 3.3A）
+	//电流环参数
+	pid_param.Iqd_Max = 1.0f; //电流限幅3.3A*0.9 = 2.97，大于这个值会削顶（1.65/50/0.01 = 3.3A）
 	pid_param.Ki_I_SumMax = 0.6f*motor_param.supply_Udc/sqrtf(3);   //最大矢量圆限幅，给90%控制裕度 
 	
 	pid_param.Kp_I = 2.0f*PI_F*motor_param.I_Width*motor_param.motor_phaseL;            //2*PI*f_bw*L
-	pid_param.Ki_I = 2.0f*PI_F*motor_param.I_Width*motor_param.motor_phaseR/20000.0f;            //2*PI*f_bw*R*dt
+	pid_param.Ki_I = 2.0f*PI_F*motor_param.I_Width*motor_param.motor_phaseR/Current_ISR_FRE;            //2*PI*f_bw*R*dt
 
-	motor_flag.pid_param_flag = 1;
+	motor_flag.pid_param_flag = 1;   //电流环PI参数变更标志位
 	
 	pid_param.Iq_aim = 0.0f;
 	pid_param.Id_aim = 0.0f;
+		
+	
+	
+	
+	//速度环参数
+	/*
+		速度环PI参数整定式子：
+			Kp = 2ζωn / Kω其中，ωn = 2π*f_bw_speed ，阻尼比ζ取0.707
+			Ki = ωn^2 / Kω ，Ki离散化还要乘执行周期Ts_v,即速度环执行周期，Ki = ωn^2 / Kω*Ts_v
+	*/
+	pid_param.Kp_S =  2.0f*0.707f*2.0f*PI_F*motor_param.Speed_Width/motor_param.Kw;  
+	pid_param.Ki_S =  (2.0f*PI_F*motor_param.Speed_Width)*(2.0f*PI_F*motor_param.Speed_Width)/motor_param.Kw*1.0f/Speed_ISR_FRE; 
+	
+	pid_param.Motor_Speed_aim = 0.0f;
+	/*速度单位换算
+		1 rpm = 0.10471975511965977 rad/s
+		1 rad/s = 9.549296585513721 rpm
+		1 rad/s = 6°/s
+	*/
+	pid_param.Speed_Max = 150.7964f;  //约为40rpm，4.18879 rad/s为输出轴限幅最大值  ,电机轴限幅值1440rpm，150.7964f rad/s
+	pid_param.Speed_KISumMax = 1.0f; 
+	
+	pid_param.Speed_lpf_k = 0.395f;   //速度滤波系数，先偏稳一点 k = 1 - e^{-2*pi*f_c*T_s}，其中f_c为滤波器截止频率，一般取速度环得5~10倍，我取80，T_s为速度环执行频率
+	
+	pid_param.Speed_Div = 20;       //分频系数，电流环执行频率/Speed_Div = 速度环执行频率
+	pid_param._1_Ts = Speed_ISR_FRE;   //速度环周期倒数（1/s），速度计算进行乘法
 	
 	//电机参数辨析参数
 	rsid_param.Ud_Set = 1.0f;            //相电阻辨析Ud电压设置（1.0-2.0之间合适，过小会有采样以及逆变器的误差干扰）
@@ -274,6 +303,37 @@ void Encoder_Task(EncoderTask_Param* encodertask_param)
 	arm_sin_cos_f32(encodertask_param->Return_Angle,&encodertask_param->sin_dsp,&encodertask_param->cos_dsp);  //DSP库计算三角，在电流环帕克变换处计算一次即可
 }
 
+//速度计算任务，运行频率1KHz
+void Speed_Measure_Task(PID_Param* sp,EncoderTask_Param* encodertask_param)
+{
+	sp->Speed_cnt++;
+	if(sp->Speed_cnt<sp->Speed_Div)
+		return;
+
+	sp->Speed_cnt = 0;
+	
+	float angle_now = encodertask_param->Shaft_Angle;  //deg
+	
+	float dtheta_deg = angle_now - sp->Shaft_Angle_Last; 
+	
+	//处理机械角跨越 0/360 度
+	if (dtheta_deg > 180.0f)
+			dtheta_deg -= 360.0f;
+	else if (dtheta_deg < -180.0f)
+			dtheta_deg += 360.0f;
+		
+	sp->Shaft_Angle_Last = 	angle_now;
+	
+	//电机轴机械角速度 rad/s  0.01745329 = PI/180.0f
+	sp->Motor_Speed_now = dtheta_deg * 0.01745329f * sp->_1_Ts;
+	//输出轴机械角速度 rad/s
+	sp->Speed_now = sp->Motor_Speed_now / motor_param.motor_gear;
+	
+	//一阶低通滤波
+	sp->Motor_Speed_filt_now += sp->Speed_lpf_k * (sp->Motor_Speed_now - sp->Motor_Speed_filt_now);
+	sp->Speed_filt += sp->Speed_lpf_k * (sp->Speed_now - sp->Speed_filt);
+}
+
 //电机运行模式任务         
 void Mode_Task()
 {
@@ -291,6 +351,13 @@ void Mode_Task()
 	else if(motor_flag.Mode_Select == 3)   //电流环运行模式
 	{
 		motor_flag.Econder_Mode = 2;
+		
+//		//1kHz更新一次测试目标，Kw辨析
+//		if(pid_param.Speed_cnt == 0)  //每次完成速度计算都会置0
+//		{
+//			SpeedID_Kw_Task(&pid_param);
+//		}
+		
 //		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_SET);
 		PID_I_Control(&pid_param);
 //		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET);
@@ -299,6 +366,16 @@ void Mode_Task()
 	else if(motor_flag.Mode_Select == 4)   //电流-速度环运行模式
 	{
 		motor_flag.Econder_Mode = 2;
+		
+		//1kHz执行速度环
+		if(pid_param.Speed_cnt == 0)  //每次完成速度计算都会置0
+		{
+			PID_Speed_Control(&pid_param);
+		}
+		
+		//20kHz电流环执行
+		PID_I_Control(&pid_param);
+		Set_Svpwm(pid_param.Uq,pid_param.Ud,encodertask_param.Return_Angle,&svpwm_param);
 	}
 	else if(motor_flag.Mode_Select == 5)   //电流-速度-位置环运行模式
 	{
@@ -336,7 +413,12 @@ void usermain()
 	
 	//2、进行编码器任务，用时10.8us
 	Encoder_Task(&encodertask_param);
+	
+	//3、进行dq实际电流计算
 	Getdq(&pid_param.Iq_now,&pid_param.Id_now);              //用时1.4us
+	
+	//4、计算电机轴实时速度
+	Speed_Measure_Task(&pid_param,&encodertask_param);
 //	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET); 
 	
 

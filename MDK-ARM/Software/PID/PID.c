@@ -6,6 +6,7 @@ extern ADCTask_Param adctask_param;          //ADC采样任务参数
 extern EncoderTask_Param encodertask_param;  //编码器任务结构体
 extern Motor_Flag motor_flag;                //电机标志位结构体
 
+//电流环PID运算
 void PID_I_Control(PID_Param* pid_i)
 {
 	//2、进行电流环Iq、Id限幅
@@ -119,8 +120,31 @@ void PID_I_Control(PID_Param* pid_i)
 //		}
 //	}
 
-	
-	
 }
 
+//速度环PID运算
+void PID_Speed_Control(PID_Param* pid_sp)
+{
+	float erro_speed = pid_sp->Motor_Speed_aim - pid_sp->Motor_Speed_filt_now;   //rad/s
 
+	//先积分
+	pid_sp->Speed_erro_sum += pid_sp->Ki_S * erro_speed;
+	
+	//未限幅输出
+	float Speed_out = pid_sp->Kp_S * erro_speed + pid_sp->Speed_erro_sum;
+	
+	//抗积分饱和：若输出已饱和且误差仍推动饱和，则回退本次积分
+	if ((Speed_out >= pid_sp->Iqd_Max && erro_speed > 0.0f) ||
+			(Speed_out <= -pid_sp->Iqd_Max && erro_speed < 0.0f))
+	{
+			pid_sp->Speed_erro_sum -= pid_sp->Ki_S * erro_speed;
+	}
+	
+	pid_sp->Speed_erro_sum = Limit(pid_sp->Speed_erro_sum, -pid_sp->Speed_KISumMax, pid_sp->Speed_KISumMax);
+	
+	Speed_out = pid_sp->Kp_S * erro_speed + pid_sp->Speed_erro_sum;
+	Speed_out = Limit(Speed_out, -pid_sp->Iqd_Max, pid_sp->Iqd_Max);
+	
+	pid_sp->Iq_aim = Speed_out;
+	pid_sp->Id_aim = 0.0f;
+}
