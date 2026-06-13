@@ -1,5 +1,8 @@
 clear; clc; close all;
 
+
+%这个Matlab程序用于求解Kw，用于速度环PI整定的一个参数
+
 %% 1) 读数据
 file = 'c:\Code\Jlink\kw测试数据.csv';
 

@@ -11,7 +11,7 @@ extern PID_Param pid_param;                  //PID参数结构体
 extern ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
 extern ScanFre_Param scanfre_param;             //扫频法测带宽结构体
 
-
+extern EncoderNLCal_Param enc_nlcal_param;      //编码器非线性化校准结构体
 
 
 
@@ -552,4 +552,14 @@ void SpeedID_Kw_Task(PID_Param* p)
         cnt = 0;
     }
 }
+
+/*********************************************************************************************************************/
+
+
+
+
+
+
+/*********************************************编码器非线性校准任务*******************************************************/
+
 

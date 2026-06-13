@@ -53,3 +53,4 @@ foc_gim4310_36_study_high\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\float.h
 foc_gim4310_36_study_high\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\limits.h
 foc_gim4310_36_study_high\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 foc_gim4310_36_study_high\main.o: ./Software/MotorID/MotorID.h
+foc_gim4310_36_study_high\main.o: ./Software/Usermain/usermain.h

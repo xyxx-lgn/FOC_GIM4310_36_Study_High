@@ -263,7 +263,36 @@ typedef struct
 	uint16_t buf_now;             //采样存储数组当前的下标值
 }ScanFre_Param;
 
+//编码器非线性校准结构体
+#define ENC_NLCAL_FIFO_LEN   64
 
+typedef struct
+{
+    uint32_t idx;             // 第几个采样点
+    int32_t  cmd_mech_tick;   // 理想机械角，对应0~16383一圈
+    uint16_t encoder_raw;     // MT6701原始值
+} EncoderNLCal_Frame;
+
+typedef struct
+{
+    uint8_t start_flag;       // 1:开始扫描
+    uint8_t done_flag;        // 1:扫描完成
+    int8_t  dir;              // +1正转，-1反转
+
+    uint16_t div_cnt;         // 分频计数
+    uint16_t div_num;         // 分频系数，100表示20kHz/100=200Hz，即5ms采一点
+
+    float ud;                 // 强拖Ud
+    float step_deg;           // 每次推进的电角度，单位deg
+    float cmd_deg;            // 当前命令电角度，单位deg
+    float mech_tick_sum;      // 累计走过的机械角tick，用来判断是否扫满一圈
+
+    uint32_t sample_idx;      // 当前采样序号
+
+    uint16_t fifo_wr;         // FIFO写指针
+    uint16_t fifo_rd;         // FIFO读指针
+    EncoderNLCal_Frame fifo[ENC_NLCAL_FIFO_LEN];
+} EncoderNLCal_Param;
 
 
 #endif

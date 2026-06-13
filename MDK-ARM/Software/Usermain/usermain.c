@@ -37,7 +37,7 @@ extern PID_Param pid_param;                  //PID参数结构体
 extern MotorID_Param rsid_param;                //电阻辨析结构体参数
 extern ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
 extern ScanFre_Param scanfre_param;             //扫频法测带宽结构体
-
+extern EncoderNLCal_Param enc_nlcal_param;      //编码器非线性化校准结构体
 
 extern uint16_t ADC1InjectDate[4];     //注入组采样数组
 
@@ -155,6 +155,23 @@ void Data_Init()
 	scanfre_param.start_flag=0;                  //scanfre_param.start_flag==0 && scanfre_param.done_flag==0 && scanfre_param.scanfre_state == SCANFRE_IDLE
 	scanfre_param.done_flag=0;                   //即上面三种情况同时成立下重新进行一次进行扫频，默认完成一次扫频done_flag置1
 	scanfre_param.scanfre_state = SCANFRE_IDLE;  //当scanfre_state不是SCANFRE_IDLE意味着扫频进行中
+	
+	// 编码器非线性连续扫描参数
+	enc_nlcal_param.start_flag = 0;
+	enc_nlcal_param.done_flag = 0;
+	enc_nlcal_param.dir = 1;                 // 默认正转
+
+	enc_nlcal_param.div_cnt = 0;
+	enc_nlcal_param.div_num = 100;           // 20kHz / 100 = 200Hz -> 5ms采一点
+
+	enc_nlcal_param.ud = 4.0f;               // 学长方案
+	enc_nlcal_param.step_deg = 0.02f * 57.2957795f;
+	enc_nlcal_param.cmd_deg = 0.0f;
+	enc_nlcal_param.mech_tick_sum = 0.0f;
+
+	enc_nlcal_param.sample_idx = 0;
+	enc_nlcal_param.fifo_wr = 0;
+	enc_nlcal_param.fifo_rd = 0;
 }
 
 
@@ -397,6 +414,123 @@ void Speed_PLL_Task(EncoderTask_Param* ep)
 	pid_param.Speed_filt = pid_param.Speed_now;                        //先不再叠加额外低通
 }
 
+
+
+static uint8_t EncoderNL_Push(EncoderNLCal_Param* p, uint32_t idx, int32_t cmd_mech_tick, uint16_t raw)
+{
+    uint16_t next = p->fifo_wr + 1;
+    if(next >= ENC_NLCAL_FIFO_LEN)
+        next = 0;
+
+    if(next == p->fifo_rd)
+        return 0;   // FIFO满，直接丢掉本点
+
+    p->fifo[p->fifo_wr].idx = idx;
+    p->fifo[p->fifo_wr].cmd_mech_tick = cmd_mech_tick;
+    p->fifo[p->fifo_wr].encoder_raw = raw;
+    p->fifo_wr = next;
+
+    return 1;
+}
+
+static uint8_t EncoderNL_Pop(EncoderNLCal_Param* p, EncoderNLCal_Frame* out)
+{
+    if(p->fifo_rd == p->fifo_wr)
+        return 0;
+
+    *out = p->fifo[p->fifo_rd];
+
+    p->fifo_rd++;
+    if(p->fifo_rd >= ENC_NLCAL_FIFO_LEN)
+        p->fifo_rd = 0;
+
+    return 1;
+}
+
+static void EncoderNL_Start(EncoderNLCal_Param* p, int8_t dir)
+{
+    p->start_flag = 1;
+    p->done_flag = 0;
+    p->dir = dir;
+
+    p->div_cnt = 0;
+    p->cmd_deg = 0.0f;
+    p->mech_tick_sum = 0.0f;
+    p->sample_idx = 0;
+    p->fifo_wr = 0;
+    p->fifo_rd = 0;
+}
+
+static void EncoderNL_Task(EncoderNLCal_Param* p, EncoderTask_Param* ep)
+{
+    float mech_step_tick;
+    int32_t cmd_mech_tick;
+
+    if(p->start_flag == 0 || p->done_flag == 1)
+        return;
+
+    p->div_cnt++;
+    if(p->div_cnt < p->div_num)
+        return;
+
+    p->div_cnt = 0;
+
+    // 1. 推进电角度命令
+    p->cmd_deg += (float)p->dir * p->step_deg;
+    p->cmd_deg = Angle_Limit(p->cmd_deg, 180.0f);
+    ep->Return_Angle = p->cmd_deg;
+
+    // 2. 按你工程当前用法，恢复理想机械角增量
+    mech_step_tick = ((p->step_deg / 360.0f) / motor_param.pole) * 16384.0f;
+    p->mech_tick_sum += (float)p->dir * mech_step_tick;
+
+    cmd_mech_tick = (int32_t)(p->mech_tick_sum + 0.5f);
+    while(cmd_mech_tick < 0) cmd_mech_tick += 16384;
+    while(cmd_mech_tick >= 16384) cmd_mech_tick -= 16384;
+
+    // 3. 记录一帧
+    EncoderNL_Push(p, p->sample_idx, cmd_mech_tick, ep->Encoder_raw);
+    p->sample_idx++;
+
+    // 4. 扫满一圈机械角就停
+    if(fabsf(p->mech_tick_sum) >= 16384.0f)
+    {
+        p->start_flag = 0;
+        p->done_flag = 1;
+    }
+}
+
+void Encoder_NLCal_PrintTask(EncoderNLCal_Param* p)
+{
+    static uint8_t header_printed = 0;
+    static uint8_t done_printed = 0;
+    EncoderNLCal_Frame frame;
+
+    if(p->start_flag == 1 && header_printed == 0)
+    {
+        printf("#ENC_NLCAL_START,dir=%d,step_deg=%.6f,pole=%.3f\r\n",
+               p->dir, p->step_deg, motor_param.pole);
+        printf("idx,cmd_mech_tick,encoder_raw\r\n");
+        header_printed = 1;
+        done_printed = 0;
+    }
+
+    while(EncoderNL_Pop(p, &frame))
+    {
+        printf("%lu,%ld,%u\r\n",
+               (unsigned long)frame.idx,
+               (long)frame.cmd_mech_tick,
+               frame.encoder_raw);
+    }
+
+    if(p->done_flag == 1 && done_printed == 0 && p->fifo_rd == p->fifo_wr)
+    {
+        printf("#ENC_NLCAL_DONE,total=%lu\r\n", (unsigned long)p->sample_idx);
+        done_printed = 1;
+        header_printed = 0;
+    }
+}
+
 //电机运行模式任务         
 void Mode_Task()
 {
@@ -464,6 +598,22 @@ void Mode_Task()
 		ScanFrequence_Task(&scanfre_param);
 		PID_I_Control(&pid_param);
 		Set_Svpwm(pid_param.Uq,pid_param.Ud,encodertask_param.Return_Angle,&svpwm_param);
+	}
+	else if(motor_flag.Mode_Select == 9)  //编码器校准
+	{
+    motor_flag.Econder_Mode = 3;       // 使用命令角，不走闭环角度
+
+    if(enc_nlcal_param.start_flag == 0 && enc_nlcal_param.done_flag == 0)
+    {
+        // 先做正转；做反转时把 +1 改成 -1
+        EncoderNL_Start(&enc_nlcal_param, -1);
+    }
+
+    EncoderNL_Task(&enc_nlcal_param, &encodertask_param);
+
+    // Ud强拖，Uq=0
+    Set_Svpwm(0.0f, enc_nlcal_param.ud, encodertask_param.Return_Angle, &svpwm_param);
+	
 	}
 }
 
