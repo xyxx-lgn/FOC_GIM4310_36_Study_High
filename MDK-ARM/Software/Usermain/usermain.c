@@ -88,7 +88,13 @@ void Data_Init()
 	encodertask_param.virtual_step = 0.252f;                    //自增步长，14极对数，360/20000*14 = 0.252相当于1圈每秒
 	encodertask_param.vf_v = 1.0f;                              //VF强托系数里面的V
 	encodertask_param.vf_k = 0.252f;                            //VF强托系数，即Uq = k*F; 得到step = k*Uq
-	
+	//PLL锁相环参数
+	encodertask_param.pll_theta_hat = 0.0f;
+	encodertask_param.pll_omega_hat = 0.0f;
+	encodertask_param.pll_zeta = 1.2f;
+	encodertask_param.pll_wn = 300.0f;
+	encodertask_param.pll_kp = 2.0f * encodertask_param.pll_zeta * encodertask_param.pll_wn;    //pll_kp = 2 * zeta * wn
+	encodertask_param.pll_ki = encodertask_param.pll_wn * encodertask_param.pll_wn;             //pll_ki = wn^2
 	
 	//PID参数
 	//电流环参数
@@ -124,7 +130,7 @@ void Data_Init()
 	pid_param.Speed_Max = 150.7964f;  //约为40rpm，4.18879 rad/s为输出轴限幅最大值  ,电机轴限幅值1440rpm，150.7964f rad/s
 	pid_param.Speed_KISumMax = 1.0f; 
 	
-	pid_param.Speed_lpf_k = 0.395f;   //速度滤波系数，先偏稳一点 k = 1 - e^{-2*pi*f_c*T_s}，其中f_c为滤波器截止频率，一般取速度环得5~10倍，我取80，T_s为速度环执行频率
+	pid_param.Speed_lpf_k = 0.467f;   //速度滤波系数，先偏稳一点 k = 1 - e^{-2*pi*f_c*T_s}，其中f_c为滤波器截止频率，一般取速度环得5~10倍，我取100，T_s为速度环执行频率
 	
 	pid_param.Speed_Div = 20;       //分频系数，电流环执行频率/Speed_Div = 速度环执行频率
 	pid_param._1_Ts = Speed_ISR_FRE;   //速度环周期倒数（1/s），速度计算进行乘法
@@ -303,7 +309,7 @@ void Encoder_Task(EncoderTask_Param* encodertask_param)
 	arm_sin_cos_f32(encodertask_param->Return_Angle,&encodertask_param->sin_dsp,&encodertask_param->cos_dsp);  //DSP库计算三角，在电流环帕克变换处计算一次即可
 }
 
-//速度计算任务，运行频率1KHz
+//速度计算任务，差分法，运行频率1KHz，和PLL测速2选1
 void Speed_Measure_Task(PID_Param* sp,EncoderTask_Param* encodertask_param)
 {
 	sp->Speed_cnt++;
@@ -332,6 +338,63 @@ void Speed_Measure_Task(PID_Param* sp,EncoderTask_Param* encodertask_param)
 	//一阶低通滤波
 	sp->Motor_Speed_filt_now += sp->Speed_lpf_k * (sp->Motor_Speed_now - sp->Motor_Speed_filt_now);
 	sp->Speed_filt += sp->Speed_lpf_k * (sp->Speed_now - sp->Speed_filt);
+}
+
+//PLL把角度误差限制到 [-pi, pi]
+static float wrap_pm_pi(float x)
+{
+    while (x > PI_F)  x -= PI2_F;
+    while (x < -PI_F) x += PI2_F;
+    return x;
+}
+//PLL把估计角度限制到 [0, 2pi)
+static float wrap_0_2pi(float x)
+{
+    while (x >= PI2_F) x -= PI2_F;
+    while (x < 0.0f)   x += PI2_F;
+    return x;
+}
+//PLL锁相环测速，运行频率 = Speed_ISR_FRE(即1kHz)，和差分法测速2选1
+void Speed_PLL_Task(EncoderTask_Param* ep)
+{
+	pid_param.Speed_cnt++;
+	if(pid_param.Speed_cnt < pid_param.Speed_Div)
+			return;
+
+	pid_param.Speed_cnt = 0;
+	
+	// 速度任务周期 Ts = 1 / Speed_ISR_FRE
+	const float Ts = 1.0f / Speed_ISR_FRE;
+	
+	// 直接使用编码器原始值构造机械角 [0, 2pi)
+	// 这样最干净，不受零偏影响，速度估算不用管零偏
+	float theta_meas = ((float)ep->Encoder_raw) * (PI2_F / 16384.0f);
+
+	// 第一次进入PLL时，对齐内部状态
+	if(ep->pll_init_flag == 0)
+	{
+		ep->pll_theta_hat = theta_meas;
+		ep->pll_omega_hat = 0.0f;
+		ep->pll_init_flag = 1;
+	}
+	
+	// 相位误差，限制到[-pi, pi]
+	float err = wrap_pm_pi(theta_meas - ep->pll_theta_hat);
+	
+	// ===== 两状态PLL =====
+	// 1) 用当前速度预测位置，并用比例项快速校正位置
+	ep->pll_theta_hat += (ep->pll_omega_hat + ep->pll_kp * err) * Ts;
+	ep->pll_theta_hat = wrap_0_2pi(ep->pll_theta_hat);
+
+	// 2) 用积分项修正速度估计
+	ep->pll_omega_hat += ep->pll_ki * err * Ts;
+	
+	// 写回现有变量
+	pid_param.Motor_Speed_now = ep->pll_omega_hat;       //电机轴机械速度 rad/s
+	pid_param.Motor_Speed_filt_now = ep->pll_omega_hat;  //先测试，让滤波速度和实际速度一致，如果效果不好再加
+	
+	pid_param.Speed_now = ep->pll_omega_hat / motor_param.motor_gear;      //输出轴速度 rad/s
+	pid_param.Speed_filt = pid_param.Speed_now;                        //先不再叠加额外低通
 }
 
 //电机运行模式任务         
@@ -418,7 +481,8 @@ void usermain()
 	Getdq(&pid_param.Iq_now,&pid_param.Id_now);              //用时1.4us
 	
 	//4、计算电机轴实时速度
-	Speed_Measure_Task(&pid_param,&encodertask_param);
+//	Speed_Measure_Task(&pid_param,&encodertask_param);
+	Speed_PLL_Task(&encodertask_param);
 //	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_11,GPIO_PIN_RESET); 
 	
 

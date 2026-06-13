@@ -111,6 +111,16 @@ typedef struct
 	float vf_k;                     //vf系数
 	float virtual_step;             //每次自增的虚拟角度步长
 	float sin_dsp,cos_dsp;          //用Return_Angle
+	
+	//PLL锁相环参数
+	float pll_theta_hat;  //PLL内部状态：机械角(rad)
+	float pll_omega_hat;  //PLL内部状态：机械角速度(rad/s)
+	float pll_zeta;       //PLL阻尼比
+	float pll_wn;         //wn：PLL 自然频率，单位 rad/s建议100~150
+	float pll_kp;
+	float pll_ki;
+	uint8_t pll_init_flag; //第一次PLL初始化对齐标志位，1代表已初始化对齐
+	
 }EncoderTask_Param;
 
 typedef struct
