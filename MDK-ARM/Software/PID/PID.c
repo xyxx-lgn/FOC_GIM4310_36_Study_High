@@ -5,6 +5,7 @@ extern PID_Param pid_param;                  //PID参数结构体
 extern ADCTask_Param adctask_param;          //ADC采样任务参数
 extern EncoderTask_Param encodertask_param;  //编码器任务结构体
 extern Motor_Flag motor_flag;                //电机标志位结构体
+extern SpeedDOB_Param speeddob_param;           //扰动观测器结构体
 
 //电流环PID运算
 void PID_I_Control(PID_Param* pid_i)
@@ -148,3 +149,78 @@ void PID_Speed_Control(PID_Param* pid_sp)
 	pid_sp->Iq_aim = Speed_out;
 	pid_sp->Id_aim = 0.0f;
 }
+
+
+//DOB扰动观测器前馈补偿
+void Speed_DOB_Init(SpeedDOB_Param* dob, float kw, float ts, float fo_hz, float zeta, float iq_ff_limit)
+{
+    dob->enable = 0;
+    dob->init_flag = 0;
+
+    dob->Ts = ts;
+    dob->Kw = kw;
+
+    dob->zeta = zeta;
+    dob->fo_hz = fo_hz;
+    dob->wo = 2.0f * PI_F * fo_hz;
+    dob->l1 = 2.0f * zeta * dob->wo;
+    dob->l2 = dob->wo * dob->wo;
+
+    dob->omega_hat = 0.0f;
+    dob->d_hat = 0.0f;
+    dob->e = 0.0f;
+
+    dob->iq_cmd_last = 0.0f;
+    dob->iq_ff = 0.0f;
+    dob->iq_ff_limit = iq_ff_limit;
+}
+
+void Speed_DOB_Reset(SpeedDOB_Param* dob, float omega_init)
+{
+    dob->init_flag = 1;
+    dob->omega_hat = omega_init;
+    dob->d_hat = 0.0f;
+    dob->e = 0.0f;
+    dob->iq_cmd_last = 0.0f;
+    dob->iq_ff = 0.0f;
+}
+
+void Speed_DOB_Task(SpeedDOB_Param* dob, float omega_meas)
+{
+    if(dob->init_flag == 0)
+    {
+        Speed_DOB_Reset(dob, omega_meas);
+        return;
+    }
+
+    if(dob->enable == 0)
+    {
+        dob->omega_hat = omega_meas;
+        dob->d_hat = 0.0f;
+        dob->e = 0.0f;
+        dob->iq_ff = 0.0f;
+        dob->iq_cmd_last = 0.0f;
+        return;
+    }
+
+    dob->e = omega_meas - dob->omega_hat;
+
+    //观测器离散实现,主要是乘以Ts实现
+    dob->omega_hat += dob->Ts * (dob->Kw * dob->iq_cmd_last - dob->d_hat + dob->l1 * dob->e);
+    dob->d_hat     += dob->Ts * (-dob->l2 * dob->e);
+
+    //把扰动限幅成“等效电流可补偿范围”
+    float d_hat_limit = dob->iq_ff_limit * dob->Kw;
+    dob->d_hat = Limit(dob->d_hat, -d_hat_limit, d_hat_limit);
+
+    if(dob->Kw > 1e-6f)
+        dob->iq_ff = dob->d_hat / dob->Kw;
+    else
+        dob->iq_ff = 0.0f;
+
+    dob->iq_ff = Limit(dob->iq_ff, -dob->iq_ff_limit, dob->iq_ff_limit);
+}
+
+
+
+

@@ -217,7 +217,7 @@
         <Ww>
           <count>12</count>
           <WinNumber>1</WinNumber>
-          <ItemText>pid_param.Speed_lpf_k</ItemText>
+          <ItemText>speeddob_param.enable,0x0A</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>

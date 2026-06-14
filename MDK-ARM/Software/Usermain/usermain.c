@@ -22,7 +22,18 @@ uint8_t pwm_map[3] = {1, 2, 3};        //输出坐标系
 // 每相电流符号修正（+1或-1）
 int8_t i_sign[3] = {-1, -1, -1};
 
-
+// ===== 编码器非线性补偿 LUT =====
+#define ENC_NL_LUT_SIZE   128
+const int16_t encoder_nl_lut[128] = {
+	-11,-8,-12,-2,-7,-14,4,7,-4,5,3,-2,13,7,-5,7,
+  6,-1,8,4,-5,2,2,-6,-1,1,-9,-4,4,-5,-2,0,
+  -10,-2,7,-4,-4,4,1,5,9,0,-1,12,9,2,9,4,
+	1,12,4,-5,5,-2,-9,2,-6,-13,-4,-9,-14,-1,-7,-16,
+	-4,-3,-6,4,-1,-7,11,14,3,12,11,6,22,16,3,14,
+	13,3,10,6,-4,3,1,-9,-4,-4,-14,-10,-3,-11,-7,-5,
+	-14,-6,3,-6,-7,2,-2,4,9,-1,-2,10,7,1,8,2,
+	-1,10,2,-6,5,-2,-8,4,-3,-10,0,-6,-8,6,1,-8
+};
 
 
 extern TIM_HandleTypeDef htim1;
@@ -38,6 +49,7 @@ extern MotorID_Param rsid_param;                //电阻辨析结构体参数
 extern ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
 extern ScanFre_Param scanfre_param;             //扫频法测带宽结构体
 extern EncoderNLCal_Param enc_nlcal_param;      //编码器非线性化校准结构体
+extern SpeedDOB_Param speeddob_param;           //扰动观测器结构体
 
 extern uint16_t ADC1InjectDate[4];     //注入组采样数组
 
@@ -108,8 +120,6 @@ void Data_Init()
 	
 	pid_param.Iq_aim = 0.0f;
 	pid_param.Id_aim = 0.0f;
-		
-	
 	
 	
 	//速度环参数
@@ -134,6 +144,11 @@ void Data_Init()
 	
 	pid_param.Speed_Div = 20;       //分频系数，电流环执行频率/Speed_Div = 速度环执行频率
 	pid_param._1_Ts = Speed_ISR_FRE;   //速度环周期倒数（1/s），速度计算进行乘法
+
+	//扰动观测器初始化   DOB结构体指针，电机Kw值，扰动观测器执行频率，带宽，阻尼比，DOB补偿电流限幅
+	Speed_DOB_Init(&speeddob_param,motor_param.Kw,1.0f / Speed_ISR_FRE,15.0f,1.0f,0.25f);
+	speeddob_param.enable = 1;       //开启DOB补偿
+	
 	
 	//电机参数辨析参数
 	rsid_param.Ud_Set = 1.0f;            //相电阻辨析Ud电压设置（1.0-2.0之间合适，过小会有采样以及逆变器的误差干扰）
@@ -159,14 +174,14 @@ void Data_Init()
 	// 编码器非线性连续扫描参数
 	enc_nlcal_param.start_flag = 0;
 	enc_nlcal_param.done_flag = 0;
-	enc_nlcal_param.dir = 1;                 // 默认正转
+	enc_nlcal_param.dir = 1;                 			      //默认正转
 
 	enc_nlcal_param.div_cnt = 0;
-	enc_nlcal_param.div_num = 100;           // 20kHz / 100 = 200Hz -> 5ms采一点
+	enc_nlcal_param.div_num = 100;          		 				//20kHz / 100 = 200Hz -> 5ms采一点
 
-	enc_nlcal_param.ud = 4.0f;               // 学长方案
-	enc_nlcal_param.step_deg = 0.02f * 57.2957795f;
-	enc_nlcal_param.cmd_deg = 0.0f;
+enc_nlcal_param.ud = 4.0f;               						//Ud强托
+	enc_nlcal_param.step_deg = 0.02f * 57.2957795f;   //每次步进电角度
+	enc_nlcal_param.cmd_deg = 0.0f;                   ////当前命令电角度，单位deg
 	enc_nlcal_param.mech_tick_sum = 0.0f;
 
 	enc_nlcal_param.sample_idx = 0;
@@ -264,20 +279,85 @@ void ADC_Task(ADCTask_Param* adctask_param,uint16_t* adc_raw)
 
 
 
+static float Encoder_NL_LutInterp(float raw_tick)
+{
+    while(raw_tick < 0.0f) {
+        raw_tick += 16384;
+    }
+    while(raw_tick >= 16384) {
+        raw_tick -= 16384;
+    }
+
+    // 映射到 LUT 连续下标 [0, 128)
+    float pos = raw_tick * ((float)ENC_NL_LUT_SIZE / (float)16384);
+
+    int idx0 = (int)pos;
+    float frac = pos - (float)idx0;
+    int idx1 = idx0 + 1;
+
+    if(idx0 >= ENC_NL_LUT_SIZE) {
+        idx0 = 0;
+    }
+    if(idx1 >= ENC_NL_LUT_SIZE) {
+        idx1 = 0;
+    }
+
+    float y0 = (float)encoder_nl_lut[idx0];
+    float y1 = (float)encoder_nl_lut[idx1];
+
+    return y0 + (y1 - y0) * frac;
+}
+
+
 //编码器采样任务
 void Encoder_Task(EncoderTask_Param* encodertask_param)
 {
+	//
+	uint16_t raw_u16;
+	float raw_f;
+	float corr_tick;
+	float raw_corr_f;
+	uint16_t raw_corr_u16;
+	
+	
 	//1、首先读读取MT6701原始值(用时6.8us)
-	uint16_t encoder_raw = MT6701_ReadRaw();    
-	if(encodertask_param->motordir == 0) 
-		encodertask_param->Encoder_raw = encoder_raw;
+	raw_u16 = MT6701_ReadRaw();    
+	encodertask_param->Encoder_raw  = raw_u16;
+	
+	raw_f = (float)raw_u16;
+	
+	if(motor_flag.Encoder_NL_Enable == 1)
+	{
+			// LUT里面存的是“测量误差”：err = raw - ideal
+			// 所以补偿时要做：raw_corr = raw - err
+			corr_tick = Encoder_NL_LutInterp(raw_f);
+			raw_corr_f = raw_f - corr_tick;
+	}
 	else
-		encodertask_param->Encoder_raw = 16384-encoder_raw;
+	{
+			raw_corr_f = raw_f;
+	}
+	
+	// 折回 0~16383
+	while(raw_corr_f < 0.0f) {
+			raw_corr_f += 16384.0f;
+	}
+	while(raw_corr_f >= 16384.0f) {
+			raw_corr_f -= 16384.0f;
+	}
+	
+	raw_corr_u16 = (uint16_t)lroundf(raw_corr_f);
+	raw_corr_u16 &= 0x3FFF;   // 保证范围在 0~16383
+	
+	if(encodertask_param->motordir == 0) 
+		encodertask_param->Encoder_raw_corr = raw_corr_u16;
+	else
+		encodertask_param->Encoder_raw_corr = (uint16_t)((16384-raw_corr_u16)& 0x3FFF);
 		
 
 	//2、转化角度值，将编码值转化为机械角度、电角度
 		////0.02197265625 = 1/16384*360
-	encodertask_param->Shaft_Angle = (float)encodertask_param->Encoder_raw * 0.02197265625f - encodertask_param->Zero_Angle; 
+	encodertask_param->Shaft_Angle = (float)encodertask_param->Encoder_raw_corr * 0.02197265625f - encodertask_param->Zero_Angle; 
 	encodertask_param->Elect_Angle = Angle_Limit(encodertask_param->Shaft_Angle * (float)motor_param.pole,180.0f);
 	
 	//3、零偏校准程序
@@ -385,7 +465,7 @@ void Speed_PLL_Task(EncoderTask_Param* ep)
 	
 	// 直接使用编码器原始值构造机械角 [0, 2pi)
 	// 这样最干净，不受零偏影响，速度估算不用管零偏
-	float theta_meas = ((float)ep->Encoder_raw) * (PI2_F / 16384.0f);
+	float theta_meas = ((float)ep->Encoder_raw_corr) * (PI2_F / 16384.0f);
 
 	// 第一次进入PLL时，对齐内部状态
 	if(ep->pll_init_flag == 0)
@@ -415,7 +495,7 @@ void Speed_PLL_Task(EncoderTask_Param* ep)
 }
 
 
-
+//磁编码器非线性化校准串口FIFO环形缓冲区写
 static uint8_t EncoderNL_Push(EncoderNLCal_Param* p, uint32_t idx, int32_t cmd_mech_tick, uint16_t raw)
 {
     uint16_t next = p->fifo_wr + 1;
@@ -433,6 +513,7 @@ static uint8_t EncoderNL_Push(EncoderNLCal_Param* p, uint32_t idx, int32_t cmd_m
     return 1;
 }
 
+//磁编码器非线性化校准串口FIFO环形缓冲区读
 static uint8_t EncoderNL_Pop(EncoderNLCal_Param* p, EncoderNLCal_Frame* out)
 {
     if(p->fifo_rd == p->fifo_wr)
@@ -447,6 +528,7 @@ static uint8_t EncoderNL_Pop(EncoderNLCal_Param* p, EncoderNLCal_Frame* out)
     return 1;
 }
 
+//磁编码器非线性化校准开启初始化
 static void EncoderNL_Start(EncoderNLCal_Param* p, int8_t dir)
 {
     p->start_flag = 1;
@@ -461,6 +543,7 @@ static void EncoderNL_Start(EncoderNLCal_Param* p, int8_t dir)
     p->fifo_rd = 0;
 }
 
+//磁编码器非线性化校准任务
 static void EncoderNL_Task(EncoderNLCal_Param* p, EncoderTask_Param* ep)
 {
     float mech_step_tick;
@@ -484,12 +567,15 @@ static void EncoderNL_Task(EncoderNLCal_Param* p, EncoderTask_Param* ep)
     mech_step_tick = ((p->step_deg / 360.0f) / motor_param.pole) * 16384.0f;
     p->mech_tick_sum += (float)p->dir * mech_step_tick;
 
-    cmd_mech_tick = (int32_t)(p->mech_tick_sum + 0.5f);
+    if (p->mech_tick_sum >= 0.0f) 
+			cmd_mech_tick = (int32_t)(p->mech_tick_sum + 0.5f);  //0.5f是为了将理想的机械位置进行四舍五入操作
+		else
+			cmd_mech_tick = (int32_t)(p->mech_tick_sum - 0.5f);    
     while(cmd_mech_tick < 0) cmd_mech_tick += 16384;
     while(cmd_mech_tick >= 16384) cmd_mech_tick -= 16384;
 
     // 3. 记录一帧
-    EncoderNL_Push(p, p->sample_idx, cmd_mech_tick, ep->Encoder_raw);
+    EncoderNL_Push(p, p->sample_idx, cmd_mech_tick, ep->Encoder_raw_corr);
     p->sample_idx++;
 
     // 4. 扫满一圈机械角就停
@@ -500,6 +586,7 @@ static void EncoderNL_Task(EncoderNLCal_Param* p, EncoderTask_Param* ep)
     }
 }
 
+//磁编码器非线性化打印任务
 void Encoder_NLCal_PrintTask(EncoderNLCal_Param* p)
 {
     static uint8_t header_printed = 0;
@@ -567,7 +654,18 @@ void Mode_Task()
 		//1kHz执行速度环
 		if(pid_param.Speed_cnt == 0)  //每次完成速度计算都会置0
 		{
+			//1、PI速度环输出
 			PID_Speed_Control(&pid_param);
+			
+			//2、执行DOB补偿，当speeddob_param.enable = 1时自动执行，否则只是速度环输出
+			Speed_DOB_Task(&speeddob_param, pid_param.Motor_Speed_filt_now);
+			
+			//3、速度环PI输出+DOB补偿输出
+			pid_param.Iq_aim += speeddob_param.iq_ff;;
+			pid_param.Iq_aim = Limit(pid_param.Iq_aim, -pid_param.Iqd_Max, pid_param.Iqd_Max);
+			
+			//4. 记录这一拍最终送给电流环的电流指令，供下一拍DOB使用
+			speeddob_param.iq_cmd_last = pid_param.Iq_aim;   //由于我这套的PCB电流噪声大，所以此处使用的是Iq_aim，真实应该使用Iq_now
 		}
 		
 		//20kHz电流环执行

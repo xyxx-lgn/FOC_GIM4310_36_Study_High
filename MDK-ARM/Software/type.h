@@ -67,6 +67,7 @@ typedef struct  //所有标志位默认为0
 	VLimitMode v_limit_mode;           //dq轴电压限幅模式选择：1为q轴优先，2为d轴优先，3为等比例限幅
 	FOC_CC_DecouplingMode dec_mode;    //电流环前馈控制模式选择，0不补偿，1dq轴解耦，2反电动势补偿，3都补偿
 	uint8_t Death_Compensation_Enable; //死区补偿使能标志位，为1开启死区补偿，0不补偿
+	uint8_t Encoder_NL_Enable;         //编码器非线性化查表补偿开启标志位，1代表开启补偿，0不补偿
 	uint8_t pid_param_flag;    
 }Motor_Flag;
 
@@ -97,6 +98,7 @@ typedef struct
 typedef struct
 {
 	uint16_t Encoder_Max;           //编码器最大值，14位磁编最大值16384
+	uint16_t Encoder_raw_corr;      //校准后的编码器值
 	uint16_t Encoder_raw;           //编码器原始数据，0-16383
 	uint8_t motordir;               //编码器旋转方向
 	float Shaft_Angle;              //机械角度
@@ -155,6 +157,31 @@ typedef struct
 	float Shaft_Angle_Last;         //上一次机械角度（deg）
 	
 }PID_Param;
+
+//DOB扰动观测器结构体
+typedef struct
+{
+    uint8_t enable;          //1: DOB使能
+    uint8_t init_flag;       //1: 已完成初值对齐
+
+    float Ts;                //观测器执行周期(s)
+    float Kw;                //rad/s^2/A
+
+	
+    float zeta;              //阻尼比
+    float fo_hz;             //观测器带宽(Hz)
+    float wo;                //观测器自然频率(rad/s)
+    float l1;                //=2*zeta*wo
+    float l2;                //=wo*wo
+
+    float omega_hat;         //观测器内部估计速度(rad/s)
+    float d_hat;             //扰动估计(rad/s^2)
+    float e;                 //速度估计误差
+
+    float iq_cmd_last;       //上一拍送给电流环的总Iq指令(A)
+    float iq_ff;             //DOB输出补偿电流(A)
+    float iq_ff_limit;       //DOB补偿限幅(A)
+} SpeedDOB_Param;
 
 //电阻参数辨析状态
 typedef enum
@@ -268,31 +295,33 @@ typedef struct
 
 typedef struct
 {
-    uint32_t idx;             // 第几个采样点
-    int32_t  cmd_mech_tick;   // 理想机械角，对应0~16383一圈
-    uint16_t encoder_raw;     // MT6701原始值
+    uint32_t idx;             //第几个采样点
+    int32_t  cmd_mech_tick;   //理想机械角，对应0~16383一圈
+    uint16_t encoder_raw;     //MT6701原始值
 } EncoderNLCal_Frame;
 
 typedef struct
 {
-    uint8_t start_flag;       // 1:开始扫描
-    uint8_t done_flag;        // 1:扫描完成
-    int8_t  dir;              // +1正转，-1反转
+    uint8_t start_flag;       //1:开始扫描
+    uint8_t done_flag;        //1:扫描完成
+    int8_t  dir;              //+1正转，-1反转
 
-    uint16_t div_cnt;         // 分频计数
-    uint16_t div_num;         // 分频系数，100表示20kHz/100=200Hz，即5ms采一点
+    uint16_t div_cnt;         //分频计数
+    uint16_t div_num;         //分频系数，100表示20kHz/100=200Hz，即5ms采一点
 
-    float ud;                 // 强拖Ud
-    float step_deg;           // 每次推进的电角度，单位deg
-    float cmd_deg;            // 当前命令电角度，单位deg
-    float mech_tick_sum;      // 累计走过的机械角tick，用来判断是否扫满一圈
+    float ud;                 //强拖Ud
+    float step_deg;           //每次推进的电角度，单位deg
+    float cmd_deg;            //当前命令电角度，单位deg
+    float mech_tick_sum;      //累计走过的机械角tick，用来判断是否扫满一圈
 
-    uint32_t sample_idx;      // 当前采样序号
+    uint32_t sample_idx;      //当前采样序号
 
-    uint16_t fifo_wr;         // FIFO写指针
-    uint16_t fifo_rd;         // FIFO读指针
+    uint16_t fifo_wr;         //FIFO写指针
+    uint16_t fifo_rd;         //FIFO读指针
     EncoderNLCal_Frame fifo[ENC_NLCAL_FIFO_LEN];
 } EncoderNLCal_Param;
+
+
 
 
 #endif

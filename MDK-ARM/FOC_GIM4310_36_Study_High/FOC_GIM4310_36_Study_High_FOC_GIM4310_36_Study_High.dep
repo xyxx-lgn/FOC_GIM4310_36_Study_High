@@ -1,7 +1,7 @@
 Dependencies for Project 'FOC_GIM4310_36_Study_High', Target 'FOC_GIM4310_36_Study_High': (DO NOT MODIFY !)
 CompilerVersion: 5060750::V5.06 update 6 (build 750)::.\ARMCC
 F (startup_stm32g431xx.s)(0x6A22C993)(--cpu Cortex-M4.fp.sp -g --apcs=interwork --pd "__MICROLIB SETA 1"-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include--pd "__UVISION_VERSION SETA 538" --pd "_RTE_ SETA 1" --pd "STM32G431xx SETA 1" --pd "_RTE_ SETA 1"--list startup_stm32g431xx.lst --xref -o foc_gim4310_36_study_high\startup_stm32g431xx.o --depend foc_gim4310_36_study_high\startup_stm32g431xx.d)
-F (../Core/Src/main.c)(0x6A2D6782)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\main.o --omf_browse foc_gim4310_36_study_high\main.crf --depend foc_gim4310_36_study_high\main.d)
+F (../Core/Src/main.c)(0x6A2E9277)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\main.o --omf_browse foc_gim4310_36_study_high\main.crf --depend foc_gim4310_36_study_high\main.d)
 I (../Core/Inc/main.h)(0x69FB308E)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h)(0x67DD529C)
 I (../Core/Inc/stm32g4xx_hal_conf.h)(0x6A22C0E5)
@@ -47,7 +47,7 @@ I (../Core/Inc/tim.h)(0x69FAEB88)
 I (../Core/Inc/usart.h)(0x6A22C0E5)
 I (../Core/Inc/gpio.h)(0x69FAEB87)
 I (./Hardware/Start_Init/Start_Init.h)(0x69F8DDCD)
-I (./Software/type.h)(0x6A2D675F)
+I (./Software/type.h)(0x6A2E995C)
 I (C:\Keil_v5\ARM\ARMCC\include\math.h)(0x5D9B3482)
 I (../Middlewares/ST/ARM/DSP/Inc/arm_math.h)(0x68C0316F)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x5D9B3488)
@@ -339,7 +339,7 @@ I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h)(0x67DD529C)
 I (../Core/Inc/stm32g4xx_it.h)(0x6A0D95A6)
 I (../Core/Inc/tim.h)(0x69FAEB88)
 I (./Software/Usermain/usermain.h)(0x6A2D6406)
-I (./Software/type.h)(0x6A2D675F)
+I (./Software/type.h)(0x6A2E995C)
 I (C:\Keil_v5\ARM\ARMCC\include\math.h)(0x5D9B3482)
 I (../Middlewares/ST/ARM/DSP/Inc/arm_math.h)(0x68C0316F)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x5D9B3488)
@@ -386,10 +386,10 @@ I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h)(0x67DD529C)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h)(0x67DD529C)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h)(0x67DD529C)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h)(0x67DD529C)
-F (.\Software\type.h)(0x6A2D675F)()
-F (.\Software\Usermain\usermain.c)(0x6A2D68AA)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\usermain.o --omf_browse foc_gim4310_36_study_high\usermain.crf --depend foc_gim4310_36_study_high\usermain.d)
+F (.\Software\type.h)(0x6A2E995C)()
+F (.\Software\Usermain\usermain.c)(0x6A2EAABF)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\usermain.o --omf_browse foc_gim4310_36_study_high\usermain.crf --depend foc_gim4310_36_study_high\usermain.d)
 I (Software\Usermain\usermain.h)(0x6A2D6406)
-I (./Software/type.h)(0x6A2D675F)
+I (./Software/type.h)(0x6A2E995C)
 I (../Core/Inc/main.h)(0x69FB308E)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h)(0x67DD529C)
 I (../Core/Inc/stm32g4xx_hal_conf.h)(0x6A22C0E5)
@@ -437,12 +437,12 @@ I (../Core/Inc/usart.h)(0x6A22C0E5)
 I (C:\Keil_v5\ARM\ARMCC\include\stdio.h)(0x5D9B348A)
 I (./Hardware/MT6701/MT6701.h)(0x69FDD576)
 I (./Software/FOC/FOC.h)(0x6A115289)
-I (./Software/PID/PID.h)(0x6A2B9E94)
+I (./Software/PID/PID.h)(0x6A2E9470)
 I (./Software/MotorID/MotorID.h)(0x6A2BEDB1)
 F (.\Software\Usermain\usermain.h)(0x6A2D6406)()
 F (.\Software\FOC\FOC.c)(0x6A27E06F)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\foc.o --omf_browse foc_gim4310_36_study_high\foc.crf --depend foc_gim4310_36_study_high\foc.d)
 I (Software\FOC\FOC.h)(0x6A115289)
-I (./Software/type.h)(0x6A2D675F)
+I (./Software/type.h)(0x6A2E995C)
 I (../Core/Inc/main.h)(0x69FB308E)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h)(0x67DD529C)
 I (../Core/Inc/stm32g4xx_hal_conf.h)(0x6A22C0E5)
@@ -489,9 +489,9 @@ I (C:\Keil_v5\ARM\ARMCC\include\limits.h)(0x5D9B3482)
 I (../Core/Inc/usart.h)(0x6A22C0E5)
 I (C:\Keil_v5\ARM\ARMCC\include\stdio.h)(0x5D9B348A)
 F (.\Software\FOC\FOC.h)(0x6A115289)()
-F (.\Software\PID\PID.c)(0x6A2BE6EB)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\pid.o --omf_browse foc_gim4310_36_study_high\pid.crf --depend foc_gim4310_36_study_high\pid.d)
-I (Software\PID\PID.h)(0x6A2B9E94)
-I (./Software/type.h)(0x6A2D675F)
+F (.\Software\PID\PID.c)(0x6A2E944F)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\pid.o --omf_browse foc_gim4310_36_study_high\pid.crf --depend foc_gim4310_36_study_high\pid.d)
+I (Software\PID\PID.h)(0x6A2E9470)
+I (./Software/type.h)(0x6A2E995C)
 I (../Core/Inc/main.h)(0x69FB308E)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h)(0x67DD529C)
 I (../Core/Inc/stm32g4xx_hal_conf.h)(0x6A22C0E5)
@@ -537,10 +537,10 @@ I (C:\Keil_v5\ARM\ARMCC\include\float.h)(0x5D9B3488)
 I (C:\Keil_v5\ARM\ARMCC\include\limits.h)(0x5D9B3482)
 I (../Core/Inc/usart.h)(0x6A22C0E5)
 I (C:\Keil_v5\ARM\ARMCC\include\stdio.h)(0x5D9B348A)
-F (.\Software\PID\PID.h)(0x6A2B9E94)()
+F (.\Software\PID\PID.h)(0x6A2E9470)()
 F (.\Software\MotorID\MotorID.c)(0x6A2D63CB)(--c99 -c --cpu Cortex-M4.fp.sp -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc -I ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ./Hardware -I ./Software -I ./Hardware/Start_Init -I ./Software/FOC -I ./Software/Usermain -I ./Hardware/MT6701 -I ./Software/PID -I ./Software/MotorID-I.\RTE\_FOC_GIM4310_36_Study_High-IC:\Users\xiaoy\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Users\xiaoy\AppData\Local\Arm\Packs\Keil\STM32G4xx_DFP\1.2.1\Drivers\CMSIS\Device\ST\STM32G4xx\Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32G431xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32G431xx-o foc_gim4310_36_study_high\motorid.o --omf_browse foc_gim4310_36_study_high\motorid.crf --depend foc_gim4310_36_study_high\motorid.d)
 I (Software\MotorID\MotorID.h)(0x6A2BEDB1)
-I (./Software/type.h)(0x6A2D675F)
+I (./Software/type.h)(0x6A2E995C)
 I (../Core/Inc/main.h)(0x69FB308E)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h)(0x67DD529C)
 I (../Core/Inc/stm32g4xx_hal_conf.h)(0x6A22C0E5)
@@ -631,7 +631,7 @@ I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h)(0x67DD529C)
 I (../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h)(0x67DD529C)
 I (../Core/Inc/adc.h)(0x69FAEB88)
 I (./Software/Usermain/usermain.h)(0x6A2D6406)
-I (./Software/type.h)(0x6A2D675F)
+I (./Software/type.h)(0x6A2E995C)
 I (C:\Keil_v5\ARM\ARMCC\include\math.h)(0x5D9B3482)
 I (../Middlewares/ST/ARM/DSP/Inc/arm_math.h)(0x68C0316F)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x5D9B3488)

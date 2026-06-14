@@ -66,6 +66,7 @@ MotorID_Param rsid_param;                //电阻辨析结构体参数
 ScanFre_Sample scanfre_buff[1200];       //扫频法数据存储区
 ScanFre_Param scanfre_param;             //扫频法测带宽结构体
 EncoderNLCal_Param enc_nlcal_param;      //编码器非线性化校准结构体
+SpeedDOB_Param speeddob_param;           //扰动观测器结构体
 
 uint16_t ADC1InjectDate[4];    //注入组采样数组
 
